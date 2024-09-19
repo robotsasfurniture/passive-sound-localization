@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "passive-sound-localization"
+version = "0.1.0"
+description = ""
+authors = ["John Finberg <johnbfinberg@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "^2.1.1"
+scipy = "^1.14.1"
+scikit-learn = "^1.5.2"
+matplotlib = "^3.9.2"
+pyroomacoustics = "^0.7.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
