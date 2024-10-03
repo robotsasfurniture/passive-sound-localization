@@ -1,3 +1,19 @@
+<div align="center">
+    <h1>
+    Robots as Furniture
+    </h1>
+    <p>
+    <b>Robots as Furniture</b> is a Python project that enables robots to function as responsive, voice-controlled furniture by interpreting spoken commands through multi-microphone audio processing and OpenAI's AI models, and executing movements via sound source localization and ROS2. <br>
+    </p>
+    <p>
+    <img src="docs/logo.png" alt="Robots as Furniture Logo" style="width: 200px; height: 200px;">
+    </p>
+    <p>
+    </p>
+    <a href="https://github.com/ddlBoJack/SLAM-LLM"><img src="https://img.shields.io/github/stars/robotsasfurniture/passive-sound-localization
+    " alt="Github Stars"></a>
+</div>
+
 # Table of Contents
 1. [Installation](#installation)
 2. [Running the project](#running-the-project)
