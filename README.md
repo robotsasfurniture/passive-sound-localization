@@ -19,3 +19,14 @@ bash scripts/run.sh
 
 # Acknowledgements
 We thank the contributors to take the time and energy to contribute to this repo. 
+
+# Citation
+If you'd like to cite this project, please use this BibTex:
+```
+@article{perez2024robotsasfurniture,
+  title={Robots as Furniture},
+  author={Nicolas Perez, John Finberg, Dave Song and others},
+  journal={https://example.com/},
+  year={2024}
+}
+```
