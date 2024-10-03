@@ -9,6 +9,7 @@ from logger import setup_logger
 
 from audio_mixer import AudioMixer
 from vad import VoiceActivityDetector
+from transcriber import Transcriber
 
 def load_audio_data(file_path: str, sample_rate: int) -> np.ndarray:
     """Load audio data from a WAV file."""
@@ -27,6 +28,7 @@ def main(cfg: Config) -> None:
     # Initialize components with configurations
     audio_mixer = AudioMixer(cfg.audio_mixer)
     vad = VoiceActivityDetector(cfg.vad)
+    transcriber = Transcriber(cfg.transcriber)
 
     try:
         while True:
@@ -50,6 +52,7 @@ def main(cfg: Config) -> None:
 
             if vad.is_speaking(mixed_audio_data):
                 # Do audio transcription and sound localization
+                transcription = transcriber.transcribe(mixed_audio_path)
                 return
             else:
                 logger.debug("No speech detected.")
