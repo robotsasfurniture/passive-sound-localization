@@ -9,4 +9,3 @@ class TranscriberConfig:
     api_key: str = os.getenv("OPENAI_API_KEY", "")  # Replace with your actual OpenAI API key
     model_name: str = "whisper-1"  # The name of the OpenAI Whisper model to use
     language: str = "en"  # Language code for transcription (e.g., 'en' for English)
-    max_retry_attempts: int = 3  # Number of times to retry transcription in case of failure
