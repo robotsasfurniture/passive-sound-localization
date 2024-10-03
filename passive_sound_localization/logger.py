@@ -1,5 +1,5 @@
 import logging
-from configs.logging_config import LoggingConfig
+from config.logging_config import LoggingConfig
 
 def setup_logger(logging_config: LoggingConfig, enable_logging: bool):
     """Sets up the logger based on configuration."""
