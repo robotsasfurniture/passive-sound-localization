@@ -5,6 +5,8 @@
 4. [Citation](#citation)
 
 # Installation
+As a pre-requisite, you must have [Poetry](https://python-poetry.org/) installed.
+
 To install the project, clone the git repo by running the following commands in your terminal:
 ```bash
 git clone https://github.com/robotsasfurniture/passive-sound-localization.git
