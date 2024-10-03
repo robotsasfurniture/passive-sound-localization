@@ -32,15 +32,15 @@ def main(cfg: Config) -> None:
             audio_mixer.record_audio()
             audio_mixer.save_audio_files()
 
-            # Load multi-channel audio data for localization
-            multi_channel_paths = [
-                os.path.join("audio_files", "multi_channel", f"output_channel_{i+1}.wav")
-                for i in range(cfg.audio_mixer.mic_count)
-            ]
-            multi_channel_data = [
-                load_audio_data(path, cfg.audio_mixer.sample_rate)
-                for path in multi_channel_paths
-            ]
+            # # Load multi-channel audio data for localization
+            # multi_channel_paths = [
+            #     os.path.join("audio_files", "multi_channel", f"output_channel_{i+1}.wav")
+            #     for i in range(cfg.audio_mixer.mic_count)
+            # ]
+            # multi_channel_data = [
+            #     load_audio_data(path, cfg.audio_mixer.sample_rate)
+            #     for path in multi_channel_paths
+            # ]
 
     except KeyboardInterrupt:
         logger.info("Shutting down.")
