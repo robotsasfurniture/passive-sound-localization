@@ -8,6 +8,7 @@ from config.config import Config
 from logger import setup_logger
 
 from audio_mixer import AudioMixer
+from vad import VoiceActivityDetector
 
 def load_audio_data(file_path: str, sample_rate: int) -> np.ndarray:
     """Load audio data from a WAV file."""
@@ -25,12 +26,17 @@ def main(cfg: Config) -> None:
 
     # Initialize components with configurations
     audio_mixer = AudioMixer(cfg.audio_mixer)
+    vad = VoiceActivityDetector(cfg.vad)
 
     try:
         while True:
             # Record and save audio
-            audio_mixer.record_audio()
-            audio_mixer.save_audio_files()
+            # audio_mixer.record_audio()
+            # audio_mixer.save_audio_files()
+
+            # Load mixed audio for VAD and transcription
+            mixed_audio_path = os.path.join("audio_files", "single_channel", "output.wav")
+            mixed_audio_data = load_audio_data(mixed_audio_path, cfg.audio_mixer.sample_rate)
 
             # # Load multi-channel audio data for localization
             # multi_channel_paths = [
@@ -41,6 +47,12 @@ def main(cfg: Config) -> None:
             #     load_audio_data(path, cfg.audio_mixer.sample_rate)
             #     for path in multi_channel_paths
             # ]
+
+            if vad.is_speaking(mixed_audio_data):
+                # Do audio transcription and sound localization
+                return
+            else:
+                logger.debug("No speech detected.")
 
     except KeyboardInterrupt:
         logger.info("Shutting down.")
