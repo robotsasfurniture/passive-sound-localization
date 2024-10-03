@@ -1,3 +1,9 @@
+# Table of Contents
+1. [Installation](#installation)
+2. [Running the project](#running-the-project)
+3. [Acknowledgements](#acknowledgments)
+4. [Citation](#citation)
+
 # Installation
 To install the project, clone the git repo by running the following commands in your terminal:
 ```bash
