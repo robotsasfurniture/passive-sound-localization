@@ -16,3 +16,6 @@ To run the project, run this bash command in your terminal:
 ```bash
 bash scripts/run.sh
 ```
+
+# Acknowledgements
+We thank the contributors to take the time and energy to contribute to this repo. 
