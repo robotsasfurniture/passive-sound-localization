@@ -3,11 +3,13 @@ from hydra.core.config_store import ConfigStore
 
 from config.feature_flags_config import FeatureFlagsConfig
 from config.logging_config import LoggingConfig
+from config.audio_mixer_config import AudioMixerConfig
 
 @dataclass
 class Config:
     feature_flags: FeatureFlagsConfig = field(default_factory=FeatureFlagsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    audio_mixer: AudioMixerConfig = field(default_factory=AudioMixerConfig)
 
 
 cs = ConfigStore.instance()
