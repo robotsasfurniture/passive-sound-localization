@@ -6,6 +6,7 @@ from config.logging_config import LoggingConfig
 from config.audio_mixer_config import AudioMixerConfig
 from config.vad_config import VADConfig
 from config.transcriber_config import TranscriberConfig
+from config.localization_config import LocalizationConfig
 
 @dataclass
 class Config:
@@ -14,6 +15,7 @@ class Config:
     audio_mixer: AudioMixerConfig = field(default_factory=AudioMixerConfig)
     vad: VADConfig = field(default_factory=VADConfig)
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
+    localization: LocalizationConfig = field(default_factory=LocalizationConfig)
 
 
 cs = ConfigStore.instance()
