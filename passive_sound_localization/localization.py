@@ -84,7 +84,7 @@ class SoundLocalizer:
     def compute_cross_spectrum(self, mic_signals, fft_size=1024):
         """Compute the cross-power spectrum between microphone pairs."""
         num_mics = mic_signals.shape[0]
-        cross_spectrum = np.zeros((num_mics, num_mics, fft_size), dtype=np.complex)
+        cross_spectrum = np.zeros((num_mics, num_mics, fft_size), dtype=np.complex128)
 
         # Compute the FFT of each microphone signal
         mic_fft = np.fft.rfft(mic_signals, fft_size)
