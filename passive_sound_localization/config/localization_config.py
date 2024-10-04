@@ -1,5 +1,7 @@
+from typing import List
+from numpy.typing import NDArray
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class LocalizationConfig:
@@ -8,4 +10,7 @@ class LocalizationConfig:
     sample_rate: int = 16000       # Sample rate of the audio in Hz
     fft_size: int = 1024           # Size of FFT to use
     angle_resolution: int = 1      # Angle resolution in degrees
-    mic_positions: np.ndarray = np.array([[0, 0, 0], [0.1, 0, 0]])  # Default 2-mic linear array
+
+    mic_positions: List[List[float]] = field(
+        default_factory=lambda: [[0, 0, 0], [0.1, 0, 0]]
+    )

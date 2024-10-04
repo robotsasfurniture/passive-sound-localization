@@ -20,7 +20,7 @@ class LocalizationResult:
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
         self.config = config
-        self.mic_positions = config.mic_positions  # Get mic positions from config
+        self.mic_positions = np.array(config.mic_positions, dtype=np.float64)  # Get mic positions from config
         self.speed_of_sound = config.speed_of_sound
         self.mic_distance = config.mic_distance
         self.sample_rate = config.sample_rate
