@@ -15,6 +15,5 @@ class Config:
     vad: VADConfig = field(default_factory=VADConfig)
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
 
-
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
