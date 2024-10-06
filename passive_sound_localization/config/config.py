@@ -13,6 +13,5 @@ class Config:
     audio_mixer: AudioMixerConfig = field(default_factory=AudioMixerConfig)
     vad: VADConfig = field(default_factory=VADConfig)
 
-
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
