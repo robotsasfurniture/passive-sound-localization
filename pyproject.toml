@@ -19,7 +19,6 @@ webrtcvad-wheels = "^2.0.14"
 openai = "^1.51.0"
 python-dotenv = "^1.0.1"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -29,7 +29,6 @@ In addition, the project uses the [OpenAI API](https://platform.openai.com/docs/
 OPENAI_API_KEY="your_api_key_here"
 ```
 
-
 To install the project, clone the git repo by running the following commands in your terminal:
 ```bash
 git clone https://github.com/robotsasfurniture/passive-sound-localization.git

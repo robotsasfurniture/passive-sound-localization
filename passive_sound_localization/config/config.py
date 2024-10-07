@@ -17,6 +17,5 @@ class Config:
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
     localization: LocalizationConfig = field(default_factory=LocalizationConfig)
 
-
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)

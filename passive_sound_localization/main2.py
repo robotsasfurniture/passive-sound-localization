@@ -31,6 +31,9 @@ def main(cfg: Config) -> None:
     vad = VoiceActivityDetector(cfg.vad)
     # transcriber = Transcriber(cfg.transcriber)
     localizer = SoundLocalizer(cfg.localization)
+    audio_mixer = AudioMixer(cfg.audio_mixer)
+    vad = VoiceActivityDetector(cfg.vad)
+    transcriber = Transcriber(cfg.transcriber)
 
     try:
         while True:
@@ -59,6 +62,18 @@ def main(cfg: Config) -> None:
 
                 for result in localization_results:
                     logger.info(f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters")
+            # multi_channel_paths = [
+            #     os.path.join("audio_files", "multi_channel", f"output_channel_{i+1}.wav")
+            #     for i in range(cfg.audio_mixer.mic_count)
+            # ]
+            # multi_channel_data = [
+            #     load_audio_data(path, cfg.audio_mixer.sample_rate)
+            #     for path in multi_channel_paths
+            # ]
+
+            if vad.is_speaking(mixed_audio_data):
+                # Do audio transcription and sound localization
+                transcription = transcriber.transcribe(mixed_audio_path)
                 return
             else:
                 logger.debug("No speech detected.")
