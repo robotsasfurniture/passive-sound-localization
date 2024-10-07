@@ -10,6 +10,7 @@ from logger import setup_logger
 from audio_mixer import AudioMixer
 from vad import VoiceActivityDetector
 from transcriber import Transcriber
+from localization import SoundLocalizer
 
 def load_audio_data(file_path: str, sample_rate: int) -> np.ndarray:
     """Load audio data from a WAV file."""
@@ -26,6 +27,10 @@ def main(cfg: Config) -> None:
     logger.info("Running main2.py...")
 
     # Initialize components with configurations
+    # audio_mixer = AudioMixer(cfg.audio_mixer)
+    vad = VoiceActivityDetector(cfg.vad)
+    # transcriber = Transcriber(cfg.transcriber)
+    localizer = SoundLocalizer(cfg.localization)
     audio_mixer = AudioMixer(cfg.audio_mixer)
     vad = VoiceActivityDetector(cfg.vad)
     transcriber = Transcriber(cfg.transcriber)
@@ -41,6 +46,22 @@ def main(cfg: Config) -> None:
             mixed_audio_data = load_audio_data(mixed_audio_path, cfg.audio_mixer.sample_rate)
 
             # # Load multi-channel audio data for localization
+            multi_channel_paths = [
+                os.path.join("audio_files", "multi_channel", f"output_channel_{i+1}.wav")
+                for i in range(cfg.audio_mixer.mic_count)
+            ]
+            multi_channel_data = [
+                load_audio_data(path, cfg.audio_mixer.sample_rate)
+                for path in multi_channel_paths
+            ]
+
+            if vad.is_speaking(mixed_audio_data):
+                # Do audio transcription and sound localization
+                # transcription_text = transcriber.transcribe(mixed_audio_path)
+                localization_results = localizer.localize(multi_channel_data, cfg.audio_mixer.sample_rate)
+
+                for result in localization_results:
+                    logger.info(f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters")
             # multi_channel_paths = [
             #     os.path.join("audio_files", "multi_channel", f"output_channel_{i+1}.wav")
             #     for i in range(cfg.audio_mixer.mic_count)
