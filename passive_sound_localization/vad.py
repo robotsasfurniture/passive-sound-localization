@@ -1,10 +1,10 @@
-# vad.py
+from passive_sound_localization.config.vad_config import VADConfig
 import numpy as np
 import webrtcvad
-from config.vad_config import VADConfig
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class VoiceActivityDetector:
     def __init__(self, config: VADConfig):

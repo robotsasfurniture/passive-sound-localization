@@ -1,5 +1,5 @@
-import numpy as np
 from scipy.io import wavfile
+import numpy as np
 import os
 
 # Constants
