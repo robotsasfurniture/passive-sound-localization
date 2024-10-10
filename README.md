@@ -10,8 +10,7 @@
     </p>
     <p>
     </p>
-    <a href="https://github.com/ddlBoJack/SLAM-LLM"><img src="https://img.shields.io/github/stars/robotsasfurniture/passive-sound-localization
-    " alt="Github Stars"></a>
+    <a href="https://github.com/robotsasfurniture/passive-sound-localization"><img src="https://img.shields.io/github/stars/robotsasfurniture/passive-sound-localization" alt="Github Stars"></a>
 </div>
 
 # Table of Contents
