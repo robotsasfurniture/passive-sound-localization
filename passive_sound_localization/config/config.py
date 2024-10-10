@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field
 from hydra.core.config_store import ConfigStore
 
-from config.feature_flags_config import FeatureFlagsConfig
-from config.logging_config import LoggingConfig
-from config.audio_mixer_config import AudioMixerConfig
-from config.vad_config import VADConfig
-from config.transcriber_config import TranscriberConfig
-from config.localization_config import LocalizationConfig
+from passive_sound_localization.config.feature_flags_config import FeatureFlagsConfig
+from passive_sound_localization.config.logging_config import LoggingConfig
+from passive_sound_localization.config.audio_mixer_config import AudioMixerConfig
+from passive_sound_localization.config.vad_config import VADConfig
+from passive_sound_localization.config.transcriber_config import TranscriberConfig
+from passive_sound_localization.config.localization_config import LocalizationConfig
+from passive_sound_localization.config.visualizer_config import VisualizerConfig
+
 
 @dataclass
 class Config:
@@ -16,6 +18,8 @@ class Config:
     vad: VADConfig = field(default_factory=VADConfig)
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
     localization: LocalizationConfig = field(default_factory=LocalizationConfig)
+    visualizer: VisualizerConfig = field(default_factory=VisualizerConfig)
+
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)

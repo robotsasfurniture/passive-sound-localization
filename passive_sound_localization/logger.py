@@ -1,5 +1,6 @@
+from passive_sound_localization.config.logging_config import LoggingConfig
 import logging
-from config.logging_config import LoggingConfig
+
 
 def setup_logger(logging_config: LoggingConfig, enable_logging: bool):
     """Sets up the logger based on configuration."""

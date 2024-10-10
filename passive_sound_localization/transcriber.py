@@ -1,9 +1,10 @@
-import os
-from config.transcriber_config import TranscriberConfig
-import logging
+from passive_sound_localization.config.transcriber_config import TranscriberConfig
 from openai import OpenAI, OpenAIError
+import logging
+import os
 
 logger = logging.getLogger(__name__)
+
 
 class Transcriber:
     def __init__(self, config: TranscriberConfig):
@@ -29,13 +30,13 @@ class Transcriber:
             raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
 
         try:
-            with open(audio_file_path, 'rb') as audio_file:
+            with open(audio_file_path, "rb") as audio_file:
                 response = self.openai_client.audio.transcriptions.create(
                     model=self.config.model_name,
                     file=audio_file,
-                    language=self.config.language
+                    language=self.config.language,
                 )
-            transcription = response['text']
+            transcription = response["text"]
             logger.info("Transcription successful.")
         except OpenAIError as e:
             logger.error(f"OpenAI API error during transcription: {e}")

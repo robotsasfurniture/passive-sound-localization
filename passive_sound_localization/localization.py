@@ -1,26 +1,30 @@
-import numpy as np
-from config.localization_config import LocalizationConfig
-from dataclasses import dataclass
-import logging
-
-logger = logging.getLogger(__name__)
-
-
+from passive_sound_localization.config.localization_config import LocalizationConfig
 from dataclasses import dataclass
 import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+from dataclasses import dataclass
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class LocalizationResult:
     distance: float  # Estimated distance to the sound source
-    angle: float     # Estimated angle to the sound source in degrees
+    angle: float  # Estimated angle to the sound source in degrees
+
 
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
         self.config = config
-        self.mic_positions = np.array(config.mic_positions, dtype=np.float64)  # Get mic positions from config
+        self.mic_positions = np.array(
+            config.mic_positions, dtype=np.float64
+        )  # Get mic positions from config
         self.speed_of_sound = config.speed_of_sound
         self.mic_distance = config.mic_distance
         self.sample_rate = config.sample_rate
@@ -28,9 +32,11 @@ class SoundLocalizer:
         self.angle_resolution = config.angle_resolution
         self.num_mics = None  # To be set when data is received
 
-    def localize(self, multi_channel_data: list, sample_rate: int, num_sources: int = 1) -> list:
+    def localize(
+        self, multi_channel_data: list, sample_rate: int, num_sources: int = 1
+    ) -> list[LocalizationResult]:
         """
-        Performs sound source localization for both single-source and multi-source cases using a 
+        Performs sound source localization for both single-source and multi-source cases using a
         frequency-domain steered beamformer.
 
         Parameters:
@@ -41,7 +47,9 @@ class SoundLocalizer:
         Returns:
         - List of LocalizationResult objects, each containing the estimated distance and angle of a localized source.
         """
-        logger.info(f"Performing sound source localization for {num_sources} source(s).")
+        logger.info(
+            f"Performing sound source localization for {num_sources} source(s)."
+        )
 
         self.num_mics = len(multi_channel_data)
         if self.num_mics < 2:
@@ -70,10 +78,16 @@ class SoundLocalizer:
             if best_direction is not None:
                 # Convert direction into an angle for the result
                 estimated_angle = np.degrees(best_direction[0])
-                estimated_distance = 1.0  # Placeholder value for distance (can be enhanced later)
+                estimated_distance = (
+                    1.0  # Placeholder value for distance (can be enhanced later)
+                )
 
                 # Append the localization result for the source
-                results.append(LocalizationResult(distance=estimated_distance, angle=estimated_angle))
+                results.append(
+                    LocalizationResult(
+                        distance=estimated_distance, angle=estimated_angle
+                    )
+                )
 
                 # Remove the contribution of the localized source to find the next source
                 delays = self.compute_delays(best_direction)
@@ -87,7 +101,9 @@ class SoundLocalizer:
         num_mics = mic_signals.shape[0]
 
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
-        cross_spectrum = np.zeros((num_mics, num_mics, fft_size // 2 + 1), dtype=np.complex128)
+        cross_spectrum = np.zeros(
+            (num_mics, num_mics, fft_size // 2 + 1), dtype=np.complex128
+        )
 
         # Compute the FFT of each microphone signal
         mic_fft = np.fft.rfft(mic_signals, fft_size)
@@ -125,9 +141,13 @@ class SoundLocalizer:
         """
         Compute time delays for each microphone given a direction on the spherical grid.
         """
-        unit_vector = np.array([np.sin(direction[0]) * np.cos(direction[1]),
-                                np.sin(direction[0]) * np.sin(direction[1]),
-                                np.cos(direction[0])])
+        unit_vector = np.array(
+            [
+                np.sin(direction[0]) * np.cos(direction[1]),
+                np.sin(direction[0]) * np.sin(direction[1]),
+                np.cos(direction[0]),
+            ]
+        )
         delays = np.dot(self.mic_positions, unit_vector) / self.speed_of_sound
         return delays
 
@@ -149,3 +169,11 @@ class SoundLocalizer:
                 tau = delays[i] - delays[j]
                 cross_spectrum[i, j] -= np.exp(1j * 2 * np.pi * tau)
         return cross_spectrum
+
+    def computer_cartesian_coordinates(self, distance, angle):
+        """
+        Compute the Cartesian coordinates of a sound source given its distance and angle.
+        """
+        x = distance * np.cos(np.radians(angle))
+        y = distance * np.sin(np.radians(angle))
+        return x, y
