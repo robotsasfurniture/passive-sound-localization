@@ -1,4 +1,4 @@
-from passive_sound_localization.config.localization_config import LocalizationConfig
+from passive_sound_localization.models.configs.localization import LocalizationConfig
 from dataclasses import dataclass
 import numpy as np
 import logging

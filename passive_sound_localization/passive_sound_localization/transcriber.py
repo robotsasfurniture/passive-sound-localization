@@ -1,4 +1,4 @@
-from passive_sound_localization.config.transcriber_config import TranscriberConfig
+from passive_sound_localization.models.configs.transcriber import TranscriberConfig
 from openai import OpenAI, OpenAIError
 import logging
 import os
@@ -12,30 +12,24 @@ class Transcriber:
         logger.info(f"API Key: {self.config.api_key}")
         self.openai_client = OpenAI(api_key=self.config.api_key)
 
-    def transcribe(self, audio_file_path: str) -> str:
+    def transcribe(self, audio_bytes: bytes) -> str:
         """
-        Transcribes audio from a file using OpenAI Whisper.
+        Transcribes audio from bytes using OpenAI Whisper.
 
         Parameters:
-        - audio_file_path: The file path to the audio file to be transcribed.
+        - audio_bytes: The audio data in bytes to be transcribed.
 
         Returns:
         - The transcribed text as a string.
         """
-        logger.info(f"Transcribing audio file: {audio_file_path}")
-
-        # Check if the file exists
-        if not os.path.isfile(audio_file_path):
-            logger.error(f"Audio file not found: {audio_file_path}")
-            raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
+        logger.info("Transcribing audio bytes.")
 
         try:
-            with open(audio_file_path, "rb") as audio_file:
-                response = self.openai_client.audio.transcriptions.create(
-                    model=self.config.model_name,
-                    file=audio_file,
-                    language=self.config.language,
-                )
+            response = self.openai_client.audio.transcriptions.create(
+                model=self.config.model_name,
+                file=audio_bytes,
+                language=self.config.language,
+            )
             transcription = response["text"]
             logger.info("Transcription successful.")
         except OpenAIError as e:

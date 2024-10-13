@@ -1,0 +1,28 @@
+localization_node:
+  ros__parameters:
+    audio_mixer:
+      sample_rate: 16000
+      chnk_size: 1024
+      record_seconds: 5
+      mic_count: 2
+    vad:
+      enabled: True
+      agressiveness: 2
+      frame_duration_ms: 30
+    transcriber:
+      api_key: ""
+      model_name: "whisper-1"
+      language: "en"
+    localization:
+      speed_of_sound: 343.0
+      mic_distance: 10
+      sample_rate: 16000
+      fft_size: 1024
+      angle_resolution: 1
+      mic_array_x: [0, 10, 0]
+      mic_array_y: [0, 0, 0]
+      mic_array_z: [0, 0, 0]
+    logging:
+      level: "INFO"
+    feature_flags:
+      enable_logging: True

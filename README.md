@@ -15,12 +15,14 @@
 </div>
 
 # Table of Contents
+
 1. [Installation](#installation)
 2. [Running the project](#running-the-project)
 3. [Acknowledgements](#acknowledgments)
 4. [Citation](#citation)
 
 # Installation
+
 As a pre-requisite, you must have [Poetry](https://python-poetry.org/) installed.
 
 In addition, the project uses the [OpenAI API](https://platform.openai.com/docs/overview). In order to use the OpenAI API, you must sign up with OpenAI and get an API key. The API key should be stored securely in an environment variable, such as an `.env` file:
@@ -30,22 +32,28 @@ OPENAI_API_KEY="your_api_key_here"
 ```
 
 To install the project, clone the git repo by running the following commands in your terminal:
+
 ```bash
 git clone https://github.com/robotsasfurniture/passive-sound-localization.git
 cd passive-sound-localization
 ```
 
-# Running the project
-To run the project, run this bash command in your terminal:
+# Running in Docker
+
+To run the project in Docker, run this bash command in your terminal:
+
 ```bash
-bash scripts/run.sh
+poetry run docker
 ```
 
 # Acknowledgements
-We thank the contributors to take the time and energy to contribute to this repo. 
+
+We thank the contributors to take the time and energy to contribute to this repo.
 
 # Citation
+
 If you'd like to cite this project, please use this BibTex:
+
 ```
 @article{perez2024robotsasfurniture,
   title={Robots as Furniture},

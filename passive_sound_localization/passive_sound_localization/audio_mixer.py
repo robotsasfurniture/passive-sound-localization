@@ -1,4 +1,4 @@
-from passive_sound_localization.config.audio_mixer_config import AudioMixerConfig
+from passive_sound_localization.models.configs.audio_mixer import AudioMixerConfig
 import numpy as np
 import logging
 import pyaudio
@@ -132,3 +132,7 @@ class AudioMixer:
         logger.debug(f"Mixed audio data length: {len(mixed_data)}")
 
         return mixed_data.tobytes()
+
+    def multi_channel_data(self):
+        """Return the recorded audio data for each channel."""
+        return self.frames_per_channel
