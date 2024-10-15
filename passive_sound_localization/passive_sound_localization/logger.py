@@ -1,4 +1,4 @@
-from passive_sound_localization.config.logging_config import LoggingConfig
+from passive_sound_localization.models.configs.logging import LoggingConfig
 import logging
 
 
