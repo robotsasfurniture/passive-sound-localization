@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from passive_sound_localization.config.localization_config import LocalizationConfig
+from passive_sound_localization.models.configs.localization import LocalizationConfig
 from typing import List, Tuple
 from dataclasses import field
 

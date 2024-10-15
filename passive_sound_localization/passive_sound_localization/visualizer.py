@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from passive_sound_localization.config.visualizer_config import VisualizerConfig
+from passive_sound_localization.models.configs.visualizer import VisualizerConfig
 
 
 class Visualizer:

@@ -1,4 +1,4 @@
-from passive_sound_localization.config.vad_config import VADConfig
+from passive_sound_localization.models.configs.vad import VADConfig
 import numpy as np
 import webrtcvad
 import logging
