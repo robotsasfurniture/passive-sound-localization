@@ -83,7 +83,11 @@ class LocalizationNode(Node):
                         result.distance, result.angle
                     )
                 )
+
                 # self.visualizer.plot(coordinate_representation)
+
+            # Publish results to ROS topic
+            self.publish_results(localization_results)
 
         if self.vad.is_speaking(multi_channel_data):
             # Do audio transcription if needed
@@ -93,6 +97,13 @@ class LocalizationNode(Node):
             return
         else:
             self.logger.debug("No speech detected.")
+
+    def publish_results(self, localization_results):
+        # Publish results to ROS topic
+        msg = String()
+        msg.data = str(localization_results)
+        self.get_logger().info(f"Publishing: {msg.data}")
+        self.publisher.publish(msg)
 
 
 def main() -> None:
