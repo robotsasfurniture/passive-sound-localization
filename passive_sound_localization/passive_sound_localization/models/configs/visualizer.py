@@ -4,7 +4,7 @@ from typing import List, Tuple
 from dataclasses import field
 
 
-@dataclass
+@dataclass(frozen=True)
 class VisualizerConfig:
     continue_execution: bool = False
     microphone_positions: List[List[float]] = field(

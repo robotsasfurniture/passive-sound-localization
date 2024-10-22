@@ -1,3 +1,4 @@
+from typing import List
 from passive_sound_localization.models.configs.localization import LocalizationConfig
 from dataclasses import dataclass
 import numpy as np
@@ -5,25 +6,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-from dataclasses import dataclass
-import numpy as np
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-@dataclass
+@dataclass(frozen=True)
 class LocalizationResult:
     distance: float  # Estimated distance to the sound source
     angle: float  # Estimated angle to the sound source in degrees
 
-
+# TODO: Take in multi-channel audio data of bytes
+# TODO: Make sure all functions are compatible
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
         self.config = config
         self.mic_positions = np.array(
-            config.mic_positions, dtype=np.float64
+            config.mic_positions, dtype=np.float32
         )  # Get mic positions from config
         self.speed_of_sound = config.speed_of_sound
         self.mic_distance = config.mic_distance
@@ -32,16 +26,23 @@ class SoundLocalizer:
         self.angle_resolution = config.angle_resolution
         self.num_mics = None  # To be set when data is received
 
+        # Generate circular plane of grid points for direction searching
+        self.grid_points = self._generate_circular_grid()
+
+        # Precompute delays and phase shifts
+        self.delays = self._compute_all_delays()
+        self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
+        self.phase_shifts = self._compute_all_phase_shifts(self.freqs)
+    
     def localize(
-        self, multi_channel_data: list, sample_rate: int, num_sources: int = 1
-    ) -> list[LocalizationResult]:
+        self, multi_channel_data: List[bytes], num_sources: int = 1
+    ) -> List[LocalizationResult]:
         """
         Performs sound source localization for both single-source and multi-source cases using a
         frequency-domain steered beamformer.
 
         Parameters:
         - multi_channel_data: List of numpy arrays containing audio data from each microphone.
-        - sample_rate: The sample rate of the audio data.
         - num_sources: The number of sound sources to localize (default is 1 for single-source localization).
 
         Returns:
@@ -64,23 +65,18 @@ class SoundLocalizer:
         data = np.vstack(multi_channel_data)
 
         # Compute the cross-power spectrum of the signals
-        cross_spectrum = self.compute_cross_spectrum(data, fft_size=self.fft_size)
-
-        # Generate spherical grid points for direction searching
-        grid_points = self.generate_spherical_grid()
+        cross_spectrum = self._compute_cross_spectrum(data, fft_size=self.fft_size)
 
         # List to hold localization results for each source
         results = []
 
         # Iteratively localize each source
         for _ in range(num_sources):
-            best_direction = self.search_best_direction(cross_spectrum, grid_points)
+            # best_direction = self._search_best_direction(cross_spectrum, grid_points)
+            best_direction, estimated_distance, source_idx = self._search_best_direction(cross_spectrum)
             if best_direction is not None:
                 # Convert direction into an angle for the result
                 estimated_angle = np.degrees(best_direction[0])
-                estimated_distance = (
-                    1.0  # Placeholder value for distance (can be enhanced later)
-                )
 
                 # Append the localization result for the source
                 results.append(
@@ -90,19 +86,18 @@ class SoundLocalizer:
                 )
 
                 # Remove the contribution of the localized source to find the next source
-                delays = self.compute_delays(best_direction)
-                cross_spectrum = self.remove_source_contribution(cross_spectrum, delays)
+                cross_spectrum = self._remove_source_contribution(cross_spectrum, source_idx)
 
         logger.info(f"Localization complete: {len(results)} source(s) found.")
         return results
 
-    def compute_cross_spectrum(self, mic_signals, fft_size=1024):
+    def _compute_cross_spectrum(self, mic_signals, fft_size=1024):
         """Compute the cross-power spectrum between microphone pairs."""
         num_mics = mic_signals.shape[0]
 
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
         cross_spectrum = np.zeros(
-            (num_mics, num_mics, fft_size // 2 + 1), dtype=np.complex128
+            (num_mics, num_mics, fft_size // 2 + 1), dtype=np.complex64
         )
 
         # Compute the FFT of each microphone signal
@@ -115,59 +110,79 @@ class SoundLocalizer:
                 cross_spectrum[j, i] = np.conj(cross_spectrum[i, j])
 
         return cross_spectrum
+    
+    def _generate_circular_grid(self, radius=1.0, num_points_radial=50, num_points_angular=360):
+        """Generate a grid of points on a circular plane, optimized for speed."""
+        # Create radial distances from 0 to the specified radius
+        r = np.linspace(0, radius, num_points_radial, dtype=np.float32)
+        
+        # Create angular values from 0 to 2*pi
+        theta = np.linspace(0, 2 * np.pi, num_points_angular, dtype=np.float32)
+        
+        # Compute x and y directly using broadcasting without creating a meshgrid
+        r = r[:, np.newaxis]  # Convert r to column vector for broadcasting
+        x = r * np.cos(theta)
+        y = r * np.sin(theta)
+        
+        # Return the points stacked as (x, y) pairs
+        return np.column_stack((x.ravel(), y.ravel()))
+    
+    def _search_best_direction(self, cross_spectrum):
+        """Search the circular grid for the direction with maximum beamformer output."""
+        energies = self._compute_beamformer_energies(cross_spectrum)
+        best_direction_idx = np.argmax(energies)
+        best_direction = self.grid_points[best_direction_idx]
+        return best_direction, best_direction_idx
+    
 
-    def generate_spherical_grid(self, num_points=2562):
-        """Generate a grid of points on the surface of a sphere."""
-        phi = np.linspace(0, 2 * np.pi, num_points)
-        theta = np.linspace(0, np.pi, num_points)
-        theta, phi = np.meshgrid(theta, phi)
-        return np.stack([theta.ravel(), phi.ravel()], axis=1)
-
-    def search_best_direction(self, cross_spectrum, grid_points):
-        """Search the spherical grid for the direction with maximum beamformer output."""
-        best_direction = None
-        max_energy = 0
-
-        for direction in grid_points:
-            delays = self.compute_delays(direction)
-            energy = self.compute_beamformer_energy(cross_spectrum, delays)
-            if energy > max_energy:
-                max_energy = energy
-                best_direction = direction
-
-        return best_direction
-
-    def compute_delays(self, direction):
+    def _compute_all_phase_shifts(self, freqs):
         """
-        Compute time delays for each microphone given a direction on the spherical grid.
+        Precompute phase shifts for all grid points, microphone pairs, and frequency bins.
         """
-        unit_vector = np.array(
-            [
-                np.sin(direction[0]) * np.cos(direction[1]),
-                np.sin(direction[0]) * np.sin(direction[1]),
-                np.cos(direction[0]),
-            ]
-        )
-        delays = np.dot(self.mic_positions, unit_vector) / self.speed_of_sound
+        # Compute tau (time delays between microphone pairs for all grid points)
+        tau = self.delays[:, :, np.newaxis] - self.delays[:, np.newaxis, :]  # Shape: (num_grid_points, num_mics, num_mics)
+
+        # Compute phase shifts for all frequencies
+        phase_shifts = np.exp(-1j * 2 * np.pi * tau[:, :, :, np.newaxis] * freqs[np.newaxis, np.newaxis, np.newaxis, :]) # Shape: (num_grid_points, num_mics, num_mics, num_freq_bins)
+        return phase_shifts
+    
+    def _compute_all_delays(self):
+        """
+        Precompute delays for all grid points and microphones.
+        """
+        # Compute distances from each microphone to each source position
+        mic_positions_2d = self.mic_positions[:, :2]  # Shape: (num_mics, 2)
+        # source_positions = self.source_positions  # Shape: (num_grid_points, 2)
+
+        # Calculate distances between microphones and source positions
+        distances = np.linalg.norm(
+            mic_positions_2d[np.newaxis, :, :] - self.grid_points[:, np.newaxis, :],
+            axis=2
+        )  # Shape: (num_grid_points, num_mics)
+
+        # Compute delays: distances divided by speed of sound
+        delays = distances / self.speed_of_sound  # Shape: (num_grid_points, num_mics)
+
         return delays
-
-    def compute_beamformer_energy(self, cross_spectrum, delays):
+    
+    def _compute_beamformer_energies(self, cross_spectrum):
         """Compute the beamformer energy given the cross-spectrum and delays."""
-        num_mics = cross_spectrum.shape[0]
-        energy = 0
-        for i in range(num_mics):
-            for j in range(i, num_mics):
-                tau = delays[i] - delays[j]
-                energy += np.sum(cross_spectrum[i, j] * np.exp(1j * 2 * np.pi * tau))
-        return np.abs(energy)
+        cross_spectrum_expanded = cross_spectrum[np.newaxis, :, :, :]
+        # Multiply and sum over mics and frequency bins
+        product = cross_spectrum_expanded * self.phase_shifts  # Shape: (num_grid_points, num_mics, num_mics, num_freq_bins)
+        energies = np.abs(np.sum(product, axis=(1, 2, 3)))  # Shape: (num_grid_points,)
+        return energies
 
-    def remove_source_contribution(self, cross_spectrum, delays):
-        """Remove the contribution of a localized source."""
-        num_mics = cross_spectrum.shape[0]
-        for i in range(num_mics):
-            for j in range(i, num_mics):
-                tau = delays[i] - delays[j]
-                cross_spectrum[i, j] -= np.exp(1j * 2 * np.pi * tau)
+    
+    def _remove_source_contribution(self, cross_spectrum, source_idx):
+        """
+        Remove the contribution of a localized source using vectorized operations.
+        """
+        # Get the phase shifts for the localized source
+        phase_shift = self.phase_shifts[source_idx]  # Shape: (num_mics, num_mics, num_freq_bins)
+
+        # Subtract the contribution from the cross-spectrum
+        cross_spectrum -= phase_shift
         return cross_spectrum
 
     def computer_cartesian_coordinates(self, distance, angle):

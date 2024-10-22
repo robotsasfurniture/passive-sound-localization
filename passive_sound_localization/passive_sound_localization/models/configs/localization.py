@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 
-@dataclass
+@dataclass(frozen=True)
 class LocalizationConfig:
     speed_of_sound: float = 343.0  # Speed of sound in m/s
     mic_distance: float = 0.1  # Distance between microphones in meters
