@@ -79,7 +79,16 @@ class LocalizationNode(Node):
             coordinate_representation = (
                 self.localizer.computer_cartesian_coordinates(
                     result.distance, result.angle
-                )
+
+                # self.visualizer.plot(coordinate_representation)
+
+            # Publish results to ROS topic
+            self.publish_results(localization_results)
+
+        if self.vad.is_speaking(multi_channel_data):
+            # Do audio transcription if needed
+            transcription = self.transcriber.transcribe(
+                self.audio_mixer.mix_audio_channels()
             )
             # self.visualizer.plot(coordinate_representation)
 
@@ -108,6 +117,13 @@ class LocalizationNode(Node):
         #     return
         else:
             self.logger.debug("No speech detected.")
+
+    def publish_results(self, localization_results):
+        # Publish results to ROS topic
+        msg = String()
+        msg.data = str(localization_results)
+        self.get_logger().info(f"Publishing: {msg.data}")
+        self.publisher.publish(msg)
 
 
 def main() -> None:
