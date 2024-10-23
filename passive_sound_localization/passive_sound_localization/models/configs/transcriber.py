@@ -5,7 +5,7 @@ import os
 load_dotenv()
 
 
-@dataclass
+@dataclass(frozen=True)
 class TranscriberConfig:
     api_key: str = os.getenv(
         "OPENAI_API_KEY", ""

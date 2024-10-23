@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(frozen=True)
 class VADConfig:
     enabled: bool = True
     aggressiveness: int = 2  # 0-3, where 3 is the most aggressive
