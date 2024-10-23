@@ -5,6 +5,7 @@ import os
 import logging
 from passive_sound_localization.audio_mixer import AudioMixer
 from passive_sound_localization.localization import SoundLocalizer
+from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
 from passive_sound_localization.transcriber import Transcriber
 from passive_sound_localization.vad import VoiceActivityDetector
 
@@ -50,73 +51,39 @@ class LocalizationNode(Node):
         self.logger.info("Running Localization Node")
 
         # Initialize components with configurations
-        # self.vad = VoiceActivityDetector(self.config.vad)
         self.localizer = SoundLocalizer(self.config.localization)
         self.audio_mixer = AudioMixer(self.config.audio_mixer)
-        # self.transcriber = Transcriber(self.config.transcriber)
-        # self.visualizer = Visualizer(cfg.visualizer)
+        self.streamer = RealtimeAudioStreamer(self.config.audio_mixer)
 
-        # Timer for periodic checks
-        self.timer = self.create_timer(
-            1.0, self.process_audio
-        )  # Adjust timer duration as needed
+        # Start processing audio
+        self.process_audio()
 
     def process_audio(self):
-        # Load mixed audio for VAD and transcription
-        # self.audio_mixer.record_audio()
-        multi_channel_data = self.audio_mixer.multi_channel_data()
+        self.logger.info("Processing audio...")
 
-        # self.visualizer.open_loading_screen()
-
-        localization_results = self.localizer.localize(
-            multi_channel_data, self.config.audio_mixer.sample_rate
-        )
-
-        for result in localization_results:
-            self.logger.info(
-                f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
+        with self.streamer as streamer:
+            # Stream audio data and pass it to the localizer
+            localization_stream = self.localizer.localize_stream(
+                streamer.multi_channel_gen(),
+                num_sources=self.config.audio_mixer.mic_count,
             )
-            coordinate_representation = (
-                self.localizer.computer_cartesian_coordinates(
-                    result.distance, result.angle
 
-                # self.visualizer.plot(coordinate_representation)
+            for localization_results in localization_stream:
+                for result in localization_results:
+                    self.logger.info(
+                        f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
+                    )
+                    coordinate_representation = (
+                        self.localizer.computer_cartesian_coordinates(
+                            result.distance, result.angle
+                        )
+                    )
+                    self.logger.info(
+                        f"Cartesian Coordinates: x={coordinate_representation[0]}, y={coordinate_representation[1]}"
+                    )
 
-            # Publish results to ROS topic
-            self.publish_results(localization_results)
-
-        if self.vad.is_speaking(multi_channel_data):
-            # Do audio transcription if needed
-            transcription = self.transcriber.transcribe(
-                self.audio_mixer.mix_audio_channels()
-            )
-            # self.visualizer.plot(coordinate_representation)
-
-        # if self.vad.is_speaking(multi_channel_data):
-        #     # Perform sound localization
-        #     localization_results = self.localizer.localize(
-        #         multi_channel_data, self.config.audio_mixer.sample_rate
-        #     )
-
-        #     for result in localization_results:
-        #         self.logger.info(
-        #             f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
-        #         )
-        #         coordinate_representation = (
-        #             self.localizer.computer_cartesian_coordinates(
-        #                 result.distance, result.angle
-        #             )
-        #         )
-        #         # self.visualizer.plot(coordinate_representation)
-
-        # if self.vad.is_speaking(multi_channel_data):
-        #     # Do audio transcription if needed
-        #     transcription = self.transcriber.transcribe(
-        #         self.audio_mixer.mix_audio_channels()
-        #     )
-        #     return
-        else:
-            self.logger.debug("No speech detected.")
+                # Publish results to ROS topic
+                self.publish_results(localization_results)
 
     def publish_results(self, localization_results):
         # Publish results to ROS topic
