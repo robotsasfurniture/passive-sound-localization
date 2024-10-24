@@ -155,7 +155,7 @@ class SoundLocalizer:
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]
-        estimated_distance = self._estimate_distance(cross_spectrum, best_direction_idx)
+        estimated_distance = self._estimate_distance(best_direction)
         return best_direction, estimated_distance, best_direction_idx
 
     def _compute_all_phase_shifts(self, freqs):
@@ -227,11 +227,11 @@ class SoundLocalizer:
         y = distance * np.sin(np.radians(angle))
         return x, y
 
-    def _estimate_distance(self, cross_spectrum, direction_idx):
+    def _estimate_distance(self, best_distance):
         """
         Estimate the distance to the sound source based on the cross-spectrum.
 
         This is a placeholder method. Implement the actual distance estimation logic here.
         """
         # Example implementation (to be replaced with actual logic)
-        return np.mean(np.abs(cross_spectrum))
+        return np.linalg.norm(best_distance)
