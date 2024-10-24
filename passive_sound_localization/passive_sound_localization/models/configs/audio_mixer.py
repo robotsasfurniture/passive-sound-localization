@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(frozen=True)
 class AudioMixerConfig:
     mic_count: int = 2  # Default to 2 microphones
     sample_rate: int = 16000  # Sample rate in Hz

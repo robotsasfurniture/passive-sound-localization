@@ -45,6 +45,14 @@ To run the project in Docker, run this bash command in your terminal:
 poetry run docker
 ```
 
+# Running Tests
+
+To run the project's automated tests, run this bash command in your terminal:
+
+```bash
+poetry run pytest
+```
+
 # Acknowledgements
 
 We thank the contributors to take the time and energy to contribute to this repo.
