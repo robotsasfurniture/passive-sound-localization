@@ -12,9 +12,6 @@ class LocalizationResult:
     distance: float  # Estimated distance to the sound source
     angle: float  # Estimated angle to the sound source in degrees
 
-
-# TODO: Take in multi-channel audio data of bytes
-# TODO: Make sure all functions are compatible
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
         self.config = config
