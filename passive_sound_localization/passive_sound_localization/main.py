@@ -1,3 +1,4 @@
+import numpy as np
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
@@ -68,28 +69,31 @@ class LocalizationNode(Node):
         with self.streamer as streamer:
             multi_channel_stream = streamer.multi_channel_gen()
 
-            #  Stream audio data and pass it to the localizer
-            localization_stream = self.localizer.localize_stream(
-                [multi_channel_stream[k] for k in multi_channel_stream.keys()],
-                num_sources=self.config.audio_mixer.mic_count,
-            )
+            for audio_data in multi_channel_stream:
+                #  Stream audio data and pass it to the localizer
+                localization_stream = self.localizer.localize_stream(
+                    np.frombuffer(
+                        [audio_data[k] for k in audio_data.keys()], dtype=np.float32
+                    ),
+                    num_sources=self.config.audio_mixer.mic_count,
+                )
 
-            for localization_results in localization_stream:
-                for result in localization_results:
-                    self.logger.info(
-                        f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
-                    )
-                    coordinate_representation = (
-                        self.localizer.computer_cartesian_coordinates(
-                            result.distance, result.angle
+                for localization_results in localization_stream:
+                    for result in localization_results:
+                        self.logger.info(
+                            f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
                         )
-                    )
-                    self.logger.info(
-                        f"Cartesian Coordinates: x={coordinate_representation[0]}, y={coordinate_representation[1]}"
-                    )
+                        coordinate_representation = (
+                            self.localizer.computer_cartesian_coordinates(
+                                result.distance, result.angle
+                            )
+                        )
+                        self.logger.info(
+                            f"Cartesian Coordinates: x={coordinate_representation[0]}, y={coordinate_representation[1]}"
+                        )
 
-                # Publish results to ROS topic
-                self.publish_results(localization_results)
+                    # Publish results to ROS topic
+                    self.publish_results(localization_results)
 
     def publish_results(self, localization_results):
         # Publish results to ROS topic
