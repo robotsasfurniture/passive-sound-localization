@@ -61,6 +61,10 @@ class SoundLocalizer:
                 raise ValueError("Insufficient number of microphones for localization.")
 
             # Ensure all channels have the same length
+            multi_channel_data = [
+                np.frombuffer(data, dtype=np.float32) for data in multi_channel_data
+            ]
+            print(multi_channel_data)
             min_length = min(len(data) for data in multi_channel_data)
             multi_channel_data = [data[:min_length] for data in multi_channel_data]
 
