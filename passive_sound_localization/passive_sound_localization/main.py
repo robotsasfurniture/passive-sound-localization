@@ -71,7 +71,9 @@ class LocalizationNode(Node):
 
             for audio_data in multi_channel_stream:
                 #  Stream audio data and pass it to the localizer
-                localization_stream = self.localizer.localize_stream(audio_data)
+                localization_stream = self.localizer.localize_stream(
+                    [audio_data[k] for k in audio_data.keys()]
+                )
 
                 for localization_results in localization_stream:
                     for result in localization_results:

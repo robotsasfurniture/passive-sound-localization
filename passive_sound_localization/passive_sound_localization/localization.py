@@ -65,8 +65,6 @@ class SoundLocalizer:
         ]
 
         print(multi_channel_data)
-        min_length = min(len(data) for data in multi_channel_data)
-        multi_channel_data = [data[:min_length] for data in multi_channel_data]
 
         # Stack the multi-channel data into a 2D array (num_mics x num_samples)
         data = np.vstack(multi_channel_data)
