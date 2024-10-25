@@ -1,13 +1,10 @@
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
-import os
 import logging
 from passive_sound_localization.audio_mixer import AudioMixer
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
-from passive_sound_localization.transcriber import Transcriber
-from passive_sound_localization.vad import VoiceActivityDetector
 
 import rclpy
 from rclpy.node import Node

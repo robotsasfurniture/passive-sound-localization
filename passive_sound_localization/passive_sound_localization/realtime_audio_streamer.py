@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator, Dict, Generator, List, Optional
+from typing import Dict, Generator, List, Optional
 from pyaudio import PyAudio, paInt16, Stream
 from scipy.signal import resample
 import numpy as np
@@ -26,14 +26,6 @@ class RealtimeAudioStreamer:
 
     def __enter__(self):
         self.audio = PyAudio()
-
-        # try:
-        #     device_info = self.audio.get_device_info_by_index(self.device_index)
-        #     self.original_sample_rate = int(device_info["defaultSampleRate"])
-        # except IndexError:
-        #     raise InvalidDeviceIndexError(
-        #         f"RealtimeAudioStreamer was provided an invalid device index: {self.device_index}"
-        #     )
 
         self.streams = [
             self.audio.open(
