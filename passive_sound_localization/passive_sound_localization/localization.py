@@ -221,7 +221,7 @@ class SoundLocalizer:
         cross_spectrum -= phase_shift
         return cross_spectrum
 
-    def computer_cartesian_coordinates(self, distance, angle):
+    def compute_cartesian_coordinates(self, distance, angle):
         """
         Compute the Cartesian coordinates of a sound source given its distance and angle.
         """

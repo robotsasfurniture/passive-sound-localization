@@ -81,7 +81,7 @@ class LocalizationNode(Node):
                             f"Estimated source at angle: {result.angle} degrees, distance: {result.distance} meters"
                         )
                         coordinate_representation = (
-                            self.localizer.computer_cartesian_coordinates(
+                            self.localizer.compute_cartesian_coordinates(
                                 result.distance, result.angle
                             )
                         )
