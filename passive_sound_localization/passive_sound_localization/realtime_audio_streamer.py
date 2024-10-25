@@ -79,9 +79,10 @@ class RealtimeAudioStreamer:
                 for device_index, stream in zip(self.device_indices, self.streams):
                     try:
                         data = stream.read(self.chunk, exception_on_overflow=False)
+                        # TODO: fix resampling
                         resampled_data = self._resample_audio(
                             data,
-                            self.original_sample_rates[device_index],
+                            self.sample_rate,
                             self.sample_rate,
                         )
                         audio_data[device_index] = resampled_data
