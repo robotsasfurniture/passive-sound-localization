@@ -54,65 +54,65 @@ class SoundLocalizer:
         """
         logger.info("Starting real-time sound source localization.")
 
-        for multi_channel_data in multi_channel_stream:
-            self.num_mics = len(multi_channel_data)
-            if self.num_mics < 2:
-                logger.error("At least two microphones are required for localization.")
-                raise ValueError("Insufficient number of microphones for localization.")
+        self.num_mics = len(multi_channel_stream)
+        if self.num_mics < 2:
+            logger.error("At least two microphones are required for localization.")
+            raise ValueError("Insufficient number of microphones for localization.")
 
-            # Ensure all channels have the same length
-            multi_channel_data = [
-                np.frombuffer(data, dtype=np.float32) for data in multi_channel_data
-            ]
-            print(multi_channel_data)
-            min_length = min(len(data) for data in multi_channel_data)
-            multi_channel_data = [data[:min_length] for data in multi_channel_data]
+        # Ensure all channels have the same length
+        multi_channel_data = [
+            np.frombuffer(data, dtype=np.float32) for data in multi_channel_stream
+        ]
 
-            # Stack the multi-channel data into a 2D array (num_mics x num_samples)
-            data = np.vstack(multi_channel_data)
+        print(multi_channel_data)
+        min_length = min(len(data) for data in multi_channel_data)
+        multi_channel_data = [data[:min_length] for data in multi_channel_data]
 
-            # Initialize buffer if it's the first chunk
-            if self.buffer is None:
-                self.buffer = data
-            else:
-                # Append new data to the buffer
-                self.buffer = np.hstack((self.buffer, data))
+        # Stack the multi-channel data into a 2D array (num_mics x num_samples)
+        data = np.vstack(multi_channel_data)
 
-                # If buffer exceeds fft_size, trim it
-                if self.buffer.shape[1] > self.fft_size:
-                    self.buffer = self.buffer[:, -self.fft_size :]
+        # Initialize buffer if it's the first chunk
+        if self.buffer is None:
+            self.buffer = data
+        else:
+            # Append new data to the buffer
+            self.buffer = np.hstack((self.buffer, data))
 
-            # Compute the cross-power spectrum of the buffered signals
-            cross_spectrum = self._compute_cross_spectrum(
-                self.buffer, fft_size=self.fft_size
+            # If buffer exceeds fft_size, trim it
+            if self.buffer.shape[1] > self.fft_size:
+                self.buffer = self.buffer[:, -self.fft_size :]
+
+        # Compute the cross-power spectrum of the buffered signals
+        cross_spectrum = self._compute_cross_spectrum(
+            self.buffer, fft_size=self.fft_size
+        )
+
+        # List to hold localization results for each source
+        results = []
+
+        # Iteratively localize each source
+        for _ in range(num_sources):
+            best_direction, estimated_distance, source_idx = (
+                self._search_best_direction(cross_spectrum)
             )
+            if best_direction is not None:
+                # Convert direction into an angle for the result
+                estimated_angle = np.degrees(best_direction[0])
 
-            # List to hold localization results for each source
-            results = []
-
-            # Iteratively localize each source
-            for _ in range(num_sources):
-                best_direction, estimated_distance, source_idx = (
-                    self._search_best_direction(cross_spectrum)
+                # Append the localization result for the source
+                results.append(
+                    LocalizationResult(
+                        distance=estimated_distance, angle=estimated_angle
+                    )
                 )
-                if best_direction is not None:
-                    # Convert direction into an angle for the result
-                    estimated_angle = np.degrees(best_direction[0])
 
-                    # Append the localization result for the source
-                    results.append(
-                        LocalizationResult(
-                            distance=estimated_distance, angle=estimated_angle
-                        )
-                    )
+                # Remove the contribution of the localized source to find the next source
+                cross_spectrum = self._remove_source_contribution(
+                    cross_spectrum, source_idx
+                )
 
-                    # Remove the contribution of the localized source to find the next source
-                    cross_spectrum = self._remove_source_contribution(
-                        cross_spectrum, source_idx
-                    )
-
-            logger.debug(f"Localization results for current chunk: {results}")
-            yield results
+        logger.debug(f"Localization results for current chunk: {results}")
+        yield results
 
         logger.info("Real-time sound source localization completed.")
 
