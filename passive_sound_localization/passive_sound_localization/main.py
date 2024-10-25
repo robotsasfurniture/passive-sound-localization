@@ -55,7 +55,7 @@ class LocalizationNode(Node):
         self.audio_mixer = AudioMixer(self.config.audio_mixer)
         self.streamer = RealtimeAudioStreamer(
             sample_rate=self.config.localization.sample_rate,
-            channels=self.config.audio_mixer.mic_count,
+            channels=1,
             chunk=self.config.audio_mixer.chunk_size,
         )
 
