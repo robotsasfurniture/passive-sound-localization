@@ -24,12 +24,12 @@ class LocalizationNode(Node):
                 ("audio_mixer.chunk_size", 1024),
                 ("audio_mixer.record_seconds", 5),
                 ("audio_mixer.mic_count", 2),
-                # ("vad.enabled", True),
-                # ("vad.aggressiveness", 2),
-                # ("vad.frame_duration_ms", 30),
-                # ("transcriber.api_key", ""),
-                # ("transcriber.model_name", "whisper-1"),
-                # ("transcriber.language", "en"),
+                ("vad.enabled", True),
+                ("vad.aggressiveness", 2),
+                ("vad.frame_duration_ms", 30),
+                ("transcriber.api_key", ""),
+                ("transcriber.model_name", "whisper-1"),
+                ("transcriber.language", "en"),
                 ("localization.speed_of_sound", 343.0),
                 ("localization.mic_distance", 10),
                 ("localization.sample_rate", 16000),
@@ -50,10 +50,17 @@ class LocalizationNode(Node):
         self.logger = logging.getLogger(__name__)
         self.logger.info("Running Localization Node")
 
+        # Setup ROS publisher
+        self.publisher = self.create_publisher(String, "localization_results", 10)
+
         # Initialize components with configurations
         self.localizer = SoundLocalizer(self.config.localization)
         self.audio_mixer = AudioMixer(self.config.audio_mixer)
-        self.streamer = RealtimeAudioStreamer(self.config.audio_mixer)
+        self.streamer = RealtimeAudioStreamer(
+            sample_rate=self.config.localization.sample_rate,
+            channels=self.config.audio_mixer.mic_count,
+            chunk=self.config.audio_mixer.chunk_size,
+        )
 
         # Start processing audio
         self.process_audio()
@@ -62,9 +69,11 @@ class LocalizationNode(Node):
         self.logger.info("Processing audio...")
 
         with self.streamer as streamer:
-            # Stream audio data and pass it to the localizer
+            multi_channel_stream = streamer.multi_channel_gen()
+
+            #  Stream audio data and pass it to the localizer
             localization_stream = self.localizer.localize_stream(
-                streamer.multi_channel_gen(),
+                [multi_channel_stream[k] for k in multi_channel_stream.keys()],
                 num_sources=self.config.audio_mixer.mic_count,
             )
 
