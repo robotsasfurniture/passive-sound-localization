@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LocalizationResult:
-    distance: float  # Estimated distance to the sound source
+    distance: float  # Estimated distance to the sound source in meters
     angle: float  # Estimated angle to the sound source in degrees
 
 class SoundLocalizer:
