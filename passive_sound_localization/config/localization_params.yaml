@@ -4,7 +4,7 @@ localization_node:
       sample_rate: 48000
       chnk_size: 1024
       record_seconds: 5
-      mic_count: 2
+      mic_count: 4
     vad:
       enabled: True
       agressiveness: 2
@@ -18,9 +18,8 @@ localization_node:
       mic_distance: 10
       sample_rate: 48000
       fft_size: 1024
-      mic_array_x: [-5, 5, 0, 0]
-      mic_array_y: [0, 0, -5, 5]
-      mic_array_z: [0, 0, 0, 0]
+      mic_array_x: [0.0000, 0.4500, 0.0000, -0.4500]
+      mic_array_y: [0.4500, 0.0000, -0.4500, 0.0000]
     logging:
       level: "INFO"
     feature_flags:

@@ -10,5 +10,10 @@ class LocalizationConfig:
     fft_size: int = 1024  # Size of FFT to use
 
     mic_positions: List[List[float]] = field(
-        default_factory=lambda: [[0, 0, 0], [0.1, 0, 0]]
+        default_factory=lambda: [
+            [0.0000, 0.4500],
+            [0.4500, 0.0000],
+            [0.0000, -0.4500],
+            [-0.4500, 0.0000]
+        ]
     )
