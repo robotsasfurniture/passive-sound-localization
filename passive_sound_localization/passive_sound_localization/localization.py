@@ -22,7 +22,6 @@ class SoundLocalizer:
         self.mic_distance = config.mic_distance
         self.sample_rate = config.sample_rate
         self.fft_size = config.fft_size
-        self.angle_resolution = config.angle_resolution
         self.num_mics = None  # To be set when data is received
 
         # Generate circular plane of grid points for direction searching

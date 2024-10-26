@@ -32,7 +32,6 @@ class LocalizationNode(Node):
                 ("localization.mic_distance", 10),
                 ("localization.sample_rate", 16000),
                 ("localization.fft_size", 1024),
-                ("localization.angle_resolution", 1),
                 ("localization.mic_array_x", [0]),
                 ("localization.mic_array_y", [0]),
                 ("localization.mic_array_z", [0]),
