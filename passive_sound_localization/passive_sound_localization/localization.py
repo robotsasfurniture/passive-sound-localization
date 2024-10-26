@@ -29,7 +29,7 @@ class SoundLocalizer:
         self.grid_points = self._generate_circular_grid()
 
         # Precompute delays and phase shifts
-        self.delays = self._compute_all_delays()
+        self.distances_to_mics, self.delays = self._compute_all_delays()
         self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
         self.phase_shifts = self._compute_all_phase_shifts(self.freqs)
 
@@ -152,7 +152,7 @@ class SoundLocalizer:
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]
-        estimated_distance = self._estimate_distance(best_direction)
+        estimated_distance = self.distances_to_mics[best_direction_idx]
         return best_direction, estimated_distance, best_direction_idx
 
     def _compute_all_phase_shifts(self, freqs):
@@ -178,20 +178,19 @@ class SoundLocalizer:
         """
         Precompute delays for all grid points and microphones.
         """
-        # Compute distances from each microphone to each source position
+        # Compute distances from each microphone to each grid point
         mic_positions_2d = self.mic_positions[:, :2]  # Shape: (num_mics, 2)
-        # source_positions = self.source_positions  # Shape: (num_grid_points, 2)
 
-        # Calculate distances between microphones and source positions
-        distances = np.linalg.norm(
+        # Calculate distances between microphones and grid points
+        distances_to_mics = np.linalg.norm(
             mic_positions_2d[np.newaxis, :, :] - self.grid_points[:, np.newaxis, :],
             axis=2,
         )  # Shape: (num_grid_points, num_mics)
 
         # Compute delays: distances divided by speed of sound
-        delays = distances / self.speed_of_sound  # Shape: (num_grid_points, num_mics)
+        delays = distances_to_mics / self.speed_of_sound  # Shape: (num_grid_points, num_mics)
 
-        return delays
+        return distances_to_mics, delays
 
     def _compute_beamformer_energies(self, cross_spectrum):
         """Compute the beamformer energy given the cross-spectrum and delays."""
@@ -223,12 +222,3 @@ class SoundLocalizer:
         x = distance * np.cos(np.radians(angle))
         y = distance * np.sin(np.radians(angle))
         return x, y
-
-    def _estimate_distance(self, best_distance):
-        """
-        Estimate the distance to the sound source based on the cross-spectrum.
-
-        This is a placeholder method. Implement the actual distance estimation logic here.
-        """
-        # Example implementation (to be replaced with actual logic)
-        return np.linalg.norm(best_distance)
