@@ -14,7 +14,6 @@ class LocalizationResult:
 
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
-        self.config = config
         self.mic_positions = np.array(
             config.mic_positions, dtype=np.float32
         )  # Get mic positions from config
@@ -110,7 +109,7 @@ class SoundLocalizer:
 
         logger.info("Real-time sound source localization completed.")
 
-    def _compute_cross_spectrum(self, mic_signals, fft_size=1024):
+    def _compute_cross_spectrum(self, mic_signals, fft_size:int=1024):
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
         cross_spectrum = np.zeros(
@@ -129,7 +128,7 @@ class SoundLocalizer:
         return cross_spectrum
 
     def _generate_circular_grid(
-        self, radius=1.0, num_points_radial=50, num_points_angular=360
+        self, radius:float=1.0, num_points_radial:int=50, num_points_angular:int=360
     ):
         """Generate a grid of points on a circular plane, optimized for speed."""
         # Create radial distances from 0 to the specified radius
