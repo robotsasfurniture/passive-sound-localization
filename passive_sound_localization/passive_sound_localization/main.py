@@ -29,7 +29,6 @@ class LocalizationNode(Node):
                 ("transcriber.model_name", "whisper-1"),
                 ("transcriber.language", "en"),
                 ("localization.speed_of_sound", 343.0),
-                ("localization.mic_distance", 10),
                 ("localization.sample_rate", 16000),
                 ("localization.fft_size", 1024),
                 ("localization.mic_array_x", [0]),

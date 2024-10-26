@@ -15,7 +15,6 @@ localization_node:
       language: "en"
     localization:
       speed_of_sound: 343.0
-      mic_distance: 10
       sample_rate: 48000
       fft_size: 1024
       mic_array_x: [0.0000, 0.4500, 0.0000, -0.4500]
