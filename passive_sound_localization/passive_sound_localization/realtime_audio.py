@@ -1,7 +1,8 @@
-from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
-from passive_sound_localization.realtime_openai_websocket import RealtimeOpenAIWebsocketClient
+from realtime_audio_streamer import RealtimeAudioStreamer
+from realtime_openai_websocket import OpenAIWebsocketClient
+# from passive_sound_localization.realtime_openai_websocket import RealtimeOpenAIWebsocketClient
 
-import asyncio
+# import asyncio
 import logging
 from dotenv import load_dotenv
 import os
@@ -10,32 +11,30 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-
-def send_audio(single_channel_generator, client: RealtimeOpenAIWebsocketClient):
-    pass
-
-def receive_messages():
-    pass
-
-async def main():
+def main():
     print("Running realtime audio...")
     api_key = os.getenv(
         "OPENAI_API_KEY", ""
     )
     websocket_url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
 
+    # self.localizer = SoundLocalizer(self.config.localization)
 
-    async with (
-        RealtimeAudioStreamer() as streamer,
-        RealtimeOpenAIWebsocketClient(api_key=api_key, websocket_url=websocket_url) as client
-    ):
-        await client.configure()
-
-        async for single_channel_audio, multi_chanel_audio in zip(streamer.single_channel_gen(), streamer.multi_channel_gen()):
-            await client.send_audio(single_channel_audio)
-            command = await client.receive_text_response()
-            localization_results = await localizer.localize(multi_chanel_audio)
-            await execute_robot(command, localization_results)
+    with (
+            RealtimeAudioStreamer() as streamer,
+            # RealtimeOpenAIWebsocketClient(api_key=api_key, websocket_url=websocket_url) as client
+            OpenAIWebsocketClient(api_key=api_key, websocket_url=websocket_url) as client
+        ):
+            for single_channel_audio, multi_channel_audio in zip(streamer.single_channel_gen(), streamer.multi_channel_gen()):
+                client.send_audio(single_channel_audio)
+                command = client.receive_text_response()
+                # command = await client.receive_text_response()
+                # for localization_results in localizer.localize_stream(
+                #     [multi_channel_audio[k] for k in multi_channel_audio.keys()]
+                # ):
+                #     for result in localization_results:
+                #         pass
+                          
 
     # async with (
     #     RealtimeAudioStreamer() as streamer, 
@@ -78,4 +77,5 @@ async def main():
 
 # Usage Example
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    main()
