@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
@@ -6,11 +7,25 @@ import logging
 from passive_sound_localization.audio_mixer import AudioMixer
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
+from passive_sound_localization.realtime_openai_websocket import OpenAIWebsocketClient
 
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String  # Import necessary message types
 
+def send_audio_continuously(client, single_channel_generator):
+    for single_channel_audio in single_channel_generator:
+        client.send_audio(single_channel_audio)
+
+def receive_text_messages(client):
+    while True:
+        try:
+            command = client.receive_text_response()
+            if command:
+                print(f"Received command: {command}")
+        except Exception as e:
+            print(f"Error receiving response: {e}")
+            break  # Exit loop if server disconnects
 
 class LocalizationNode(Node):
     def __init__(self):
@@ -35,6 +50,8 @@ class LocalizationNode(Node):
                 ("localization.mic_array_y", [0]),
                 ("logging.level", "INFO"),
                 ("feature_flags.enable_logging", True),
+                ("openai_websocket.api_key", ""),
+                ("openai_websocket.websocket_url", "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"),
             ],
         )
 
@@ -56,6 +73,10 @@ class LocalizationNode(Node):
             channels=1,
             chunk=self.config.audio_mixer.chunk_size,
         )
+        self.openai_ws_client = OpenAIWebsocketClient(
+            api_key=self.config.openai_ws_client.api_key,
+            websocket_url=self.config.openai_websocket.websocket_url,
+        )
 
         # Start processing audio
         self.process_audio()
@@ -63,8 +84,17 @@ class LocalizationNode(Node):
     def process_audio(self):
         self.logger.info("Processing audio...")
 
-        with self.streamer as streamer:
+        with (
+            self.streamer as streamer,
+            self.openai_ws_client as client
+        ):
             multi_channel_stream = streamer.multi_channel_gen()
+            single_channel_stream = streamer.single_channel_gen()
+
+            # TODO: Clean up threading so the localization is properly integrated
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                executor.submit(send_audio_continuously, client, single_channel_stream)
+                executor.submit(receive_text_messages, client)
 
             for audio_data in multi_channel_stream:
                 #  Stream audio data and pass it to the localizer
