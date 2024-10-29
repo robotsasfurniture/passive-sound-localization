@@ -1,5 +1,6 @@
 from typing import List, Iterator, Optional, Tuple
 from passive_sound_localization.models.configs.localization import LocalizationConfig
+# from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
 from dataclasses import dataclass
 import numpy as np
 import logging
@@ -50,14 +51,14 @@ class SoundLocalizer:
         if self.mic_positions.shape[0] < 2:
             raise TooFewMicrophonePositionsError(f"There should be at least 2 microphone positions. Currently only {self.mic_positions.size} microphone position(s) were configured")
         
-        if self.mic_positions.shape[1] == 2:
+        if self.mic_positions.shape[1] < 2:
             raise MicrophonePositionShapeError(f"The microphone positions should be in (x,y) pairs. Currently the microphone positions come in pairs of shape {self.mic_positions.shape[1]}")
 
         
         self.speed_of_sound:float = config.speed_of_sound
         self.sample_rate:int = config.sample_rate
         self.fft_size:int = config.fft_size
-        self.num_mics:int = self.mic_positions.size  # To be set when data is received
+        self.num_mics:int = self.mic_positions.shape[0]  # To be set when data is received
 
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
@@ -94,14 +95,12 @@ class SoundLocalizer:
             raise TooFewMicrophoneStreamsError(f"There should be at least 2 microphone streams. Currently there are only {num_mic_streams} microphone streams")
         
         if self.num_mics != num_mic_streams:
-            raise MicrophoneStreamSizeMismatchError(f"The number of microphone streams should match the number of microphone positions. Currently there are {num_mic_streams} microphone streams and {self.num_mic} microphone positions")
+            raise MicrophoneStreamSizeMismatchError(f"The number of microphone streams should match the number of microphone positions. Currently there are {num_mic_streams} microphone streams and {self.num_mics} microphone positions")
         
         # Convert buffers into numpy arrays
         multi_channel_data = [
             np.frombuffer(data, dtype=np.float32) for data in multi_channel_stream
         ]
-
-        print(multi_channel_data)
 
         # TODO: Refactor buffer processing into its own method for testing
 
@@ -134,6 +133,7 @@ class SoundLocalizer:
                 self._search_best_direction(cross_spectrum)
             )
             if best_direction is not None:
+                print(best_direction)
                 # Convert direction into an angle for the result
                 estimated_angle = np.degrees(best_direction[0])
 
@@ -154,12 +154,16 @@ class SoundLocalizer:
 
         logger.info("Real-time sound source localization completed.")
 
-    def _compute_cross_spectrum(self, mic_signals:np.ndarray[np.float32], fft_size:int=1024) -> np.ndarray[np.complex64]:
+    def _compute_cross_spectrum(self, mic_signals:np.ndarray[np.float32], fft_size:int=1024) -> np.ndarray[np.complex128]:
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
         # cross_spectrum = np.zeros(
         #     (self.num_mics, self.num_mics, fft_size // 2 + 1), dtype=np.complex64
         # )
+
+        # print(f"Does the mic_signals have any na values or inf values {np.isnan(mic_signals).any() or np.isinf(mic_signals).any()}")
+
+        mic_signals = mic_signals.astype(np.float64)
 
         # Compute the FFT of each microphone signal
         mic_fft = np.fft.rfft(mic_signals, fft_size)
@@ -193,15 +197,16 @@ class SoundLocalizer:
         # Return the points stacked as (x, y) pairs
         return np.column_stack((x.ravel(), y.ravel()))
 
-    def _search_best_direction(self, cross_spectrum: np.ndarray[np.complex64]) -> Tuple[np.ndarray, np.float32, int]:
+    def _search_best_direction(self, cross_spectrum: np.ndarray[np.complex128]) -> Tuple[np.ndarray, np.float32, int]:
         """Search the circular grid for the direction with maximum beamformer output."""
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]
         estimated_distance = np.min(self.distances_to_mics[best_direction_idx])
+        print(f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}")
         return best_direction, estimated_distance, best_direction_idx
 
-    def _compute_all_phase_shifts(self, freqs: np.ndarray[np.float32]) -> np.ndarray[np.complex64]:
+    def _compute_all_phase_shifts(self, freqs: np.ndarray[np.float32]) -> np.ndarray[np.complex128]:
         """
         Precompute phase shifts for all grid points, microphone pairs, and frequency bins.
         """
@@ -238,7 +243,7 @@ class SoundLocalizer:
 
         return distances_to_mics, delays
 
-    def _compute_beamformer_energies(self, cross_spectrum: np.ndarray[np.complex64]) -> np.ndarray:
+    def _compute_beamformer_energies(self, cross_spectrum: np.ndarray[np.complex128]) -> np.ndarray:
         """Compute the beamformer energy given the cross-spectrum and delays."""
         cross_spectrum_expanded = cross_spectrum[np.newaxis, :, :, :]
         # Multiply and sum over mics and frequency bins
@@ -248,7 +253,7 @@ class SoundLocalizer:
         energies = np.abs(np.sum(product, axis=(1, 2, 3)))  # Shape: (num_grid_points,)
         return energies
 
-    def _remove_source_contribution(self, cross_spectrum: np.ndarray[np.complex64], source_idx: int) -> np.ndarray[np.complex64]:
+    def _remove_source_contribution(self, cross_spectrum: np.ndarray[np.complex128], source_idx: int) -> np.ndarray[np.complex128]:
         """
         Remove the contribution of a localized source using vectorized operations.
         """
