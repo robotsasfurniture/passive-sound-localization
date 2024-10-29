@@ -17,12 +17,14 @@ class RealtimeAudioStreamer:
         self.sample_rate: int = sample_rate
         self.channels: int = channels
         self.chunk: int = chunk
-        self.device_indices: List[int] = [2, 3, 4, 5]
+        # self.device_indices: List[int] = [2, 3, 4, 5] # Lab configuration
+        # self.device_indices: List[int] = [4, 6, 8, 10] # Nico's laptop (configuration 1)
+        self.device_indices: List[int] = [2, 4, 6, 8] # Nico's laptop (configuration 2)
         self.format = paInt16
         self.audio: Optional[PyAudio] = None
         self.streams: List[Optional[Stream]] = []
         self.streaming: bool = False
-        self.original_sample_rates: Dict[int, int] = {}
+        self.original_sample_rates: Dict[int, int] = {2: 48000, 4: 48000, 6: 48000, 8: 48000}
 
     def __enter__(self):
         self.audio = PyAudio()
@@ -101,9 +103,9 @@ class RealtimeAudioStreamer:
                     try:
                         data = stream.read(self.chunk, exception_on_overflow=False)
                         resampled_data = self._resample_audio(
-                            data,
-                            self.original_sample_rates[device_index],
-                            self.sample_rate,
+                            audio_data=data,
+                            original_sample_rate=self.sample_rate,
+                            target_sample_rate=self.sample_rate,
                         )
                         audio_array = np.frombuffer(resampled_data, dtype=np.int16)
                         audio_arrays.append(audio_array)

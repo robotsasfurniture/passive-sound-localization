@@ -1,15 +1,17 @@
 from websockets import Data, ConnectionClosed, InvalidHandshake, InvalidURI, WebSocketClientProtocol
-import websockets
-import asyncio
+from websockets.sync.client import connect
 import json
 import base64
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
+
+from passive_sound_localization.models.configs.openai_websocket import OpenAIWebsocketConfig
 
 logger = logging.getLogger(__name__)
 
 class InvalidWebsocketURIError(Exception):
-    pass
+    def __init__(self, websocket_url: str) -> None:
+        super().__init__(f"Invalid Websocker URI was passed: {websocket_url}")
 
 class WebsocketTCPError(Exception):
     pass
@@ -27,88 +29,92 @@ class SessionNotUpdatedError(Exception):
     pass
 
 
-# TODO: Azure OpenAI Websocket Client Reference: https://github.com/Azure-Samples/aoai-realtime-audio-sdk/blob/main/python/rtclient/__init__.py#L616
-# TODO: https://github.com/Azure-Samples/aoai-realtime-audio-sdk/blob/main/python/rtclient/low_level_client.py
+INSTRUCTIONS = """
+    The instructor robot will receive audio input to determine movement actions based on command cues. For each command, the robot should perform a corresponding movement action as follows:
+
+- **Audio cues for 'Left'** – MOVE_LEFT
+- **Audio cues for 'Right'** – MOVE_RIGHT
+- **Audio cues for 'Up'** – MOVE_UP
+- **Audio cues for 'Down'** – MOVE_DOWN
+- **Audio cues for 'Rotate Left'** – ROTATE_LEFT
+- **Audio cues for 'Rotate Right'** – ROTATE_RIGHT
+- **Audio cues for 'Stop'** – STOP
+- **Audio cues for 'Continue'** – CONTINUE
+
+The robot should only respond using these commands. The robot should analyze audio input continuously and prioritize the most recent command. If ambiguous commands are detected (e.g., unclear or overlapping), the robot should remain in its last known state until a clearer command is received.
+    """
+
+
 # TODO: Make it take in Hydra config
-
-class CustomMessageQueue():
-    def __init__(self):
-        self.message_queue = asyncio.Queue()
-
-    async def put(self, message: Any):
-        await self.message_queue.put(message)
-
-    async def receive(self):
-        pass
-
-
-
-class RealtimeOpenAIWebsocketClient:
-    def __init__(self, api_key: str, websocket_url: str):
-        self.api_key: str = api_key
-        self.websocket_url: str = websocket_url
+class OpenAIWebsocketClient:
+    def __init__(self,  config: OpenAIWebsocketConfig):
+        self.api_key: str = config.api_key
+        self.websocket_url: str = config.websocket_url
+        self.session_id: Optional[str] = None
+        self.instructions: str = INSTRUCTIONS
         self.ws: Optional[WebSocketClientProtocol] = None
-        self.message_queue = CustomMessageQueue()
 
-    async def __aenter__(self):
-        await self.connect()
+    def __enter__(self):
+        self._connect()
+        self._configure_session()
+        print("Connected websocket...")
         return self
     
-    async def connect(self) -> None:
-        try:
-            self.ws = await websockets.connect(
-                self.websocket_url,
-                extra_headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "OpenAI-Beta": "realtime=v1"
-                }
-            )
-        except InvalidURI:
-            raise InvalidWebsocketURIError(f"Invalid Websocker URI was passed: {self.websocket_url}")
-        except OSError:
-            raise WebsocketTCPError(f"Error occurred with Websocket TCP connection")
-        except InvalidHandshake:
-            raise InvalidWebsocketHandshakeError("Error occurred with Websocket handshake")
-        except TimeoutError:
-            raise WebsocketTimeOutError("Websocket timed out") 
-    async def configure(self) -> None:
-        await self.ws.send(json.dumps({
+    def __exit__(self):
+        self._close()
+
+    def _connect(self) -> None:
+        self.ws = connect(
+            uri=self.websocket_url,
+            additional_headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "OpenAI-Beta": "realtime=v1"
+            }
+        )
+
+        message = json.loads(self.ws.recv())
+        self.session_id = message["session"]["id"]
+        if message["type"] != "session.created":
+            raise SessionNotCreatedError("Session was not created")
+
+    def _configure_session(self) -> None:
+        self.ws.send(json.dumps({
             "type": "session.update",
             "session": {
                 "modalities": ["text"],
-                "instructions": "Your knowledge cutoff is 2023-10. You are a helpful assistant.",
+                "instructions": self.instructions,
                 "input_audio_format": "pcm16",
                 "turn_detection": {
-                    "type": "server_vad"
-                }
+                    "type": "server_vad",
+                    "threshold": 0.5,
+                    "prefix_padding_ms": 300,
+                    "silence_duration_ms": 500
+                },
+                "temperature": 0.8,
+                 "max_response_output_tokens": 4096
             }
         }))
 
-        # Wait for session.updated message
-        message = await self.message_queue.receive(lambda m: m.get("type") == "session.updated")
-
-        if message["type"] == "error":
+        message = json.loads(self.ws.recv())
+        if message["type"] != "session.updated":
             raise SessionNotUpdatedError("Session was not updated")
-    
-    async def close(self) -> None:
-        if self.ws:
-            await self.ws.close()
-            self.ws = None
-    async def __aexit__(self, *args):
-        await self.close()
-    
-    async def send_audio(self, audio_chunk: bytes) -> None:
+
+
+
+    def send_audio(self, audio_chunk: bytes) -> None:
         audio_b64 = base64.b64encode(audio_chunk).decode()
 
-        await self.ws.send(json.dumps({
+        self.ws.send(json.dumps({
             "type": "input_audio_buffer.append",
             "audio": audio_b64
         }))
-    
-    async def _receive_message(self) -> Optional[Data]:
-        async for message in self.ws:
-            return message
-        return None
-    
-    async def receive_text_response(self):
-        pass
+
+    def receive_text_response(self) -> str:
+        message = json.loads(self.ws.recv())
+        if message["type"] == "response.text.done":
+            return message["text"]
+
+    def _close(self) -> None:
+        if self.ws:
+            self.ws.close()
+            self.ws = None

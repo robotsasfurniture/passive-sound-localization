@@ -16,6 +16,31 @@ from passive_sound_localization.models.configs.logging import (
 from passive_sound_localization.models.configs.feature_flags import (
     FeatureFlagsConfig,
 )
+
+from passive_sound_localization.models.configs.openai_websocket import (
+    OpenAIWebsocketConfig,
+)
+
+# from models.configs.audio_mixer import (
+#     AudioMixerConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.localization import (
+#     LocalizationConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.transcriber import (
+#     TranscriberConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.vad import (
+#     VADConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.logging import (
+#     LoggingConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.feature_flags import (
+#     FeatureFlagsConfig,
+# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+
+
 from dataclasses import dataclass, field
 
 
@@ -27,6 +52,7 @@ class Config:
     vad: VADConfig = field(default_factory=VADConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     feature_flags: FeatureFlagsConfig = field(default_factory=FeatureFlagsConfig)
+    openai_websocket: OpenAIWebsocketConfig = field(default_factory=OpenAIWebsocketConfig)
 
     def build_configs(self) -> "Config":
         def calculate_mic_positions() -> list[list[float]]:
@@ -75,4 +101,9 @@ class Config:
             feature_flags=FeatureFlagsConfig(
                 enable_logging=self.get_parameter("feature_flags.enable_logging").value
             ),
+            openai_websocket =OpenAIWebsocketConfig(
+                api_key=self.get_parameter("openai_websocket.api_key").value,
+                websocket_url=self.get_parameter("openai_websocket.websocket_url").value,
+                instructions=self.get_parameter("openai_websocket.instructions").value
+            )
         )
