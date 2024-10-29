@@ -1,5 +1,6 @@
 {
-    "python.analysis.extraPaths": [
-        "./passive_sound_localization",
-    ]
+  "python.analysis.extraPaths": [
+    "./passive_sound_localization",
+    "./packages/passive_sound_localization"
+  ]
 }

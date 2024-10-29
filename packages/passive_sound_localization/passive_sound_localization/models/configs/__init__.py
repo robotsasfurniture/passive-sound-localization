@@ -52,20 +52,19 @@ class Config:
     vad: VADConfig = field(default_factory=VADConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     feature_flags: FeatureFlagsConfig = field(default_factory=FeatureFlagsConfig)
-    openai_websocket: OpenAIWebsocketConfig = field(default_factory=OpenAIWebsocketConfig)
+    openai_websocket: OpenAIWebsocketConfig = field(
+        default_factory=OpenAIWebsocketConfig
+    )
 
     def build_configs(self) -> "Config":
         def calculate_mic_positions() -> list[list[float]]:
             mic_array_x = self.get_parameter("localization.mic_array_x").value
             mic_array_y = self.get_parameter("localization.mic_array_y").value
-            mic_array_z = self.get_parameter("localization.mic_array_z").value
 
-            if len(mic_array_x) != len(mic_array_y) or len(mic_array_x) != len(
-                mic_array_z
-            ):
+            if len(mic_array_x) != len(mic_array_y):
                 raise ValueError("Mic array dimensions must match.")
 
-            return list(zip(mic_array_x, mic_array_y, mic_array_z))
+            return list(zip(mic_array_x, mic_array_y))
 
         return Config(
             audio_mixer=AudioMixerConfig(
@@ -101,9 +100,11 @@ class Config:
             feature_flags=FeatureFlagsConfig(
                 enable_logging=self.get_parameter("feature_flags.enable_logging").value
             ),
-            openai_websocket =OpenAIWebsocketConfig(
+            openai_websocket=OpenAIWebsocketConfig(
                 api_key=self.get_parameter("openai_websocket.api_key").value,
-                websocket_url=self.get_parameter("openai_websocket.websocket_url").value,
-                instructions=self.get_parameter("openai_websocket.instructions").value
-            )
+                websocket_url=self.get_parameter(
+                    "openai_websocket.websocket_url"
+                ).value,
+                instructions=self.get_parameter("openai_websocket.instructions").value,
+            ),
         )

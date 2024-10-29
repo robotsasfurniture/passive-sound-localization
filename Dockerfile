@@ -27,7 +27,8 @@ RUN mkdir -p /root/ros2_ws/src
 WORKDIR /root/ros2_ws
 
 # Copy the package from the host into the container (replace `my_python_package` with your package name)
-COPY ./passive_sound_localization /root/ros2_ws/src/passive_sound_localization
+# COPY ./passive_sound_localization /root/ros2_ws/src/passive_sound_localization
+COPY ./packages/ /root/ros2_ws/src/
 
 # Build the workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"
