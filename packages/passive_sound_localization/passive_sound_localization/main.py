@@ -1,17 +1,17 @@
-from concurrent.futures import ThreadPoolExecutor
-import numpy as np
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
-import logging
 from passive_sound_localization.audio_mixer import AudioMixer
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
 from passive_sound_localization.realtime_openai_websocket import OpenAIWebsocketClient
+from passive_sound_localization_msgs.msg import LocalizationResult
 
-import rclpy
+from concurrent.futures import ThreadPoolExecutor
 from rclpy.node import Node
-from std_msgs.msg import String  # Import necessary message types
+import numpy as np
+import logging
+import rclpy
 
 
 def send_audio_continuously(client, single_channel_generator):
@@ -72,7 +72,9 @@ class LocalizationNode(Node):
         self.logger.info("Running Localization Node")
 
         # Setup ROS publisher
-        self.publisher = self.create_publisher(String, "localization_results", 10)
+        self.publisher = self.create_publisher(
+            LocalizationResult, "localization_results", 10
+        )
 
         # Initialize components with configurations
         self.localizer = SoundLocalizer(self.config.localization)
@@ -124,9 +126,12 @@ class LocalizationNode(Node):
 
     def publish_results(self, localization_results):
         # Publish results to ROS topic
-        msg = String()
-        msg.data = str(localization_results)
-        self.get_logger().info(f"Publishing: {msg.data}")
+        msg = LocalizationResult()
+        msg.angle = localization_results.angle
+        msg.distance = localization_results.distance
+        self.get_logger().info(
+            f"Publishing: angle={msg.angle}, distance={msg.distance}"
+        )
         self.publisher.publish(msg)
 
 
