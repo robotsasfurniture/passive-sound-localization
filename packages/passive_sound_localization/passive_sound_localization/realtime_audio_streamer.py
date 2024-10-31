@@ -7,11 +7,6 @@ from passive_sound_localization.models.configs.realtime_streamer import Realtime
 
 logger = logging.getLogger(__name__)
 
-
-class InvalidDeviceIndexError(Exception):
-    pass
-
-
 class RealtimeAudioStreamer:
     def __init__(self, config: RealtimeAudioStreamerConfig):
         self.sample_rate: int = config.sample_rate
