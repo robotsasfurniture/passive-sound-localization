@@ -1,3 +1,4 @@
+from typing import Generator
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
@@ -12,12 +13,12 @@ import logging
 import rclpy
 
 
-def send_audio_continuously(client, single_channel_generator):
+def send_audio_continuously(client: RealtimeAudioStreamer, single_channel_generator: Generator[bytes, None, None]):
     for single_channel_audio in single_channel_generator:
         client.send_audio(single_channel_audio)
 
 
-def receive_text_messages(client):
+def receive_text_messages(client: RealtimeAudioStreamer):
     while True:
         try:
             command = client.receive_text_response()
