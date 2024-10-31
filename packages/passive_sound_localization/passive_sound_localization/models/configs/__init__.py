@@ -85,7 +85,6 @@ class Config:
                 websocket_url=self.get_parameter(
                     "openai_websocket.websocket_url"
                 ).value,
-                instructions=self.get_parameter("openai_websocket.instructions").value,
             ),
             realtime_streamer=RealtimeAudioStreamerConfig(
                 sample_rate=check_sample_rates(),
