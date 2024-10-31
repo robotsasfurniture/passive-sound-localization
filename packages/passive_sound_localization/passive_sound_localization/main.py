@@ -8,7 +8,6 @@ from passive_sound_localization_msgs.msg import LocalizationResult
 
 from concurrent.futures import ThreadPoolExecutor
 from rclpy.node import Node
-import numpy as np
 import logging
 import rclpy
 
