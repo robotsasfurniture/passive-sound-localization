@@ -76,7 +76,7 @@ class LocalizationNode(Node):
         self.streamer = RealtimeAudioStreamer(
             sample_rate=self.config.localization.sample_rate,
             channels=1,
-            chunk=self.config.audio_mixer.chunk_size,
+            chunk=self.config.localization.fft_size,
         )
         self.openai_ws_client = OpenAIWebsocketClient(self.config.openai_websocket)
 
