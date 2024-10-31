@@ -12,6 +12,8 @@ from passive_sound_localization.models.configs.openai_websocket import (
     OpenAIWebsocketConfig,
 )
 
+from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+
 # from models.configs.localization import (
 #     LocalizationConfig,
 # ) # Need import paths like this to test audio streaming with `realtime_audio.py`
@@ -21,6 +23,7 @@ from passive_sound_localization.models.configs.openai_websocket import (
 # from models.configs.feature_flags import (
 #     FeatureFlagsConfig,
 # ) # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.realtime_streamer import RealtimeAudioStreamerConfig # Need import paths like this to test audio streaming with `realtime_audio.py`
 
 
 from dataclasses import dataclass, field
@@ -34,6 +37,7 @@ class Config:
     openai_websocket: OpenAIWebsocketConfig = field(
         default_factory=OpenAIWebsocketConfig
     )
+    realtime_streamer: RealtimeAudioStreamerConfig = field(default_factory=RealtimeAudioStreamerConfig)
 
     def build_configs(self) -> "Config":
         def calculate_mic_positions() -> list[list[float]]:
@@ -67,4 +71,10 @@ class Config:
                 ).value,
                 instructions=self.get_parameter("openai_websocket.instructions").value,
             ),
+            realtime_streamer=RealtimeAudioStreamerConfig(
+                sample_rate=self.get_parameter("realtime_streamer.sample_rate").value,
+                channels=self.get_parameter("realtime_streamer.channels").value,
+                chunk=self.get_parameter("realtime_streamer.chunk").value,
+                device_indices=self.get_parameter("realtime_streamer.device_indices").value
+            )
         )

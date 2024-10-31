@@ -48,7 +48,10 @@ class LocalizationNode(Node):
                     "openai_websocket.websocket_url",
                     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
                 ),
-                ("openai_websocket.instructions", ""),
+                ("realtime_streamer.sample_rate", 48000),
+                ("realtime_streamer.channels", 1),
+                ("realtime_streamer.chunk", 1024),
+                ("realtime_streamer.device_indices", [2, 3, 4, 5])
             ],
         )
 
@@ -66,11 +69,7 @@ class LocalizationNode(Node):
 
         # Initialize components with configurations
         self.localizer = SoundLocalizer(self.config.localization)
-        self.streamer = RealtimeAudioStreamer(
-            sample_rate=self.config.localization.sample_rate,
-            channels=1,
-            chunk=self.config.localization.fft_size,
-        )
+        self.streamer = RealtimeAudioStreamer(self.config.realtime_streamer)
         self.openai_ws_client = OpenAIWebsocketClient(self.config.openai_websocket)
 
         # Start processing audio

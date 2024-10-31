@@ -4,6 +4,8 @@ from pyaudio import PyAudio, paInt16, Stream
 from scipy.signal import resample
 import numpy as np
 
+from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,13 +15,14 @@ class InvalidDeviceIndexError(Exception):
 
 # TODO: Make it take in Hydra config
 class RealtimeAudioStreamer:
-    def __init__(self, sample_rate: int = 24000, channels: int = 1, chunk: int = 1024):
-        self.sample_rate: int = sample_rate
-        self.channels: int = channels
-        self.chunk: int = chunk
+    def __init__(self, config: RealtimeAudioStreamerConfig):
+        self.sample_rate: int = config.sample_rate
+        self.channels: int = config.channels
+        self.chunk: int = config.chunk
+        self.device_indices = config.device_indices
         # self.device_indices: List[int] = [2, 3, 4, 5] # Lab configuration
         # self.device_indices: List[int] = [4, 6, 8, 10] # Nico's laptop (configuration 1)
-        self.device_indices: List[int] = [2, 4, 6, 8] # Nico's laptop (configuration 2)
+        # self.device_indices: List[int] = [2, 4, 6, 8] # Nico's laptop (configuration 2)
         self.format = paInt16
         self.audio: Optional[PyAudio] = None
         self.streams: List[Optional[Stream]] = []

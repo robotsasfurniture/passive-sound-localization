@@ -13,4 +13,8 @@ localization_node:
     openai_websocket:
       api_key: ""
       websocket_url: "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
-      instructions: ""
+    realtime_streamer:
+      sample_rate: 48000
+      channels: 1
+      chunk: 1024
+      device_indices: [2, 3, 4, 5]
