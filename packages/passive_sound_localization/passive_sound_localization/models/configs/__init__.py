@@ -65,9 +65,6 @@ class Config:
                 / 100,
                 sample_rate=self.get_parameter("localization.sample_rate").value,
                 fft_size=self.get_parameter("localization.fft_size").value,
-                angle_resolution=self.get_parameter(
-                    "localization.angle_resolution"
-                ).value,
                 mic_positions=calculate_mic_positions(),
             ),
             logging=LoggingConfig(

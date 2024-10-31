@@ -46,7 +46,6 @@ class LocalizationNode(Node):
                 ("localization.mic_array_x", [0.00]),
                 ("localization.mic_array_y", [0.00]),
                 ("localization.mic_distance", 0.05),
-                ("localization.angle_resolution", 1),
                 ("logging.level", "INFO"),
                 ("feature_flags.enable_logging", True),
                 ("openai_websocket.api_key", ""),
