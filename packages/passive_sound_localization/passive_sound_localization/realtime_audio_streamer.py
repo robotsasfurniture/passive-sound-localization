@@ -18,9 +18,6 @@ class RealtimeAudioStreamer:
         self.channels: int = config.channels
         self.chunk: int = config.chunk
         self.device_indices = config.device_indices
-        # self.device_indices: List[int] = [2, 3, 4, 5] # Lab configuration
-        # self.device_indices: List[int] = [4, 6, 8, 10] # Nico's laptop (configuration 1)
-        # self.device_indices: List[int] = [2, 4, 6, 8] # Nico's laptop (configuration 2)
         self.format = paInt16
         self.audio: Optional[PyAudio] = None
         self.streams: List[Optional[Stream]] = []
