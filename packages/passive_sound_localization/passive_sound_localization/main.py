@@ -36,7 +36,7 @@ class LocalizationNode(Node):
             namespace="",
             parameters=[
                 ("localization.speed_of_sound", 343.0),
-                ("localization.sample_rate", 16000),
+                ("localization.sample_rate", 24000),
                 ("localization.fft_size", 1024),
                 ("localization.mic_array_x", [0.00]),
                 ("localization.mic_array_y", [0.00]),
@@ -47,7 +47,7 @@ class LocalizationNode(Node):
                     "openai_websocket.websocket_url",
                     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
                 ),
-                ("realtime_streamer.sample_rate", 48000),
+                ("realtime_streamer.sample_rate", 24000),
                 ("realtime_streamer.channels", 1),
                 ("realtime_streamer.chunk", 1024),
                 ("realtime_streamer.device_indices", [2, 3, 4, 5])

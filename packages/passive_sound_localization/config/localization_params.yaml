@@ -2,7 +2,7 @@ localization_node:
   ros__parameters:
     localization:
       speed_of_sound: 343.0
-      sample_rate: 48000
+      sample_rate: 24000
       fft_size: 1024
       mic_array_x: [0.0000, 0.4500, 0.0000, -0.4500]
       mic_array_y: [0.4500, 0.0000, -0.4500, 0.0000]
@@ -14,7 +14,7 @@ localization_node:
       api_key: ""
       websocket_url: "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
     realtime_streamer:
-      sample_rate: 48000
+      sample_rate: 24000
       channels: 1
       chunk: 1024
       device_indices: [2, 3, 4, 5]
