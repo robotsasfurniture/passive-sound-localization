@@ -1,7 +1,6 @@
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
-from passive_sound_localization.audio_mixer import AudioMixer
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
 from passive_sound_localization.realtime_openai_websocket import OpenAIWebsocketClient
@@ -36,10 +35,6 @@ class LocalizationNode(Node):
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("audio_mixer.sample_rate", 16000),
-                ("audio_mixer.chunk_size", 1024),
-                ("audio_mixer.record_seconds", 5),
-                ("audio_mixer.mic_count", 4),
                 ("localization.speed_of_sound", 343.0),
                 ("localization.sample_rate", 16000),
                 ("localization.fft_size", 1024),
@@ -71,7 +66,6 @@ class LocalizationNode(Node):
 
         # Initialize components with configurations
         self.localizer = SoundLocalizer(self.config.localization)
-        self.audio_mixer = AudioMixer(self.config.audio_mixer)
         self.streamer = RealtimeAudioStreamer(
             sample_rate=self.config.localization.sample_rate,
             channels=1,
