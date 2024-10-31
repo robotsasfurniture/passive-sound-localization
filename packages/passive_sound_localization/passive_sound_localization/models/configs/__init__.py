@@ -4,9 +4,6 @@ from passive_sound_localization.models.configs.audio_mixer import (
 from passive_sound_localization.models.configs.localization import (
     LocalizationConfig,
 )
-from passive_sound_localization.models.configs.transcriber import (
-    TranscriberConfig,
-)
 from passive_sound_localization.models.configs.logging import (
     LoggingConfig,
 )
@@ -24,9 +21,6 @@ from passive_sound_localization.models.configs.openai_websocket import (
 # from models.configs.localization import (
 #     LocalizationConfig,
 # ) # Need import paths like this to test audio streaming with `realtime_audio.py`
-# from models.configs.transcriber import (
-#     TranscriberConfig,
-# ) # Need import paths like this to test audio streaming with `realtime_audio.py`
 # from models.configs.logging import (
 #     LoggingConfig,
 # ) # Need import paths like this to test audio streaming with `realtime_audio.py`
@@ -42,7 +36,6 @@ from dataclasses import dataclass, field
 class Config:
     audio_mixer: AudioMixerConfig = field(default_factory=AudioMixerConfig)
     localization: LocalizationConfig = field(default_factory=LocalizationConfig)
-    transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     feature_flags: FeatureFlagsConfig = field(default_factory=FeatureFlagsConfig)
     openai_websocket: OpenAIWebsocketConfig = field(
@@ -65,11 +58,6 @@ class Config:
                 chunk_size=self.get_parameter("audio_mixer.chunk_size").value,
                 record_seconds=self.get_parameter("audio_mixer.record_seconds").value,
                 mic_count=self.get_parameter("audio_mixer.mic_count").value,
-            ),
-            transcriber=TranscriberConfig(
-                api_key=self.get_parameter("transcriber.api_key").value,
-                model_name=self.get_parameter("transcriber.model_name").value,
-                language=self.get_parameter("transcriber.language").value,
             ),
             localization=LocalizationConfig(
                 speed_of_sound=self.get_parameter("localization.speed_of_sound").value,
