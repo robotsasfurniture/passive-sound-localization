@@ -70,8 +70,6 @@ class Config:
         return Config(
             localization=LocalizationConfig(
                 speed_of_sound=self.get_parameter("localization.speed_of_sound").value,
-                mic_distance=self.get_parameter("localization.mic_distance").value
-                / 100,
                 sample_rate=check_sample_rates(),
                 fft_size=check_chunk_sizes(),
                 mic_positions=calculate_mic_positions(),
