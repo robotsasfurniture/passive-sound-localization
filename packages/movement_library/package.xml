@@ -9,6 +9,8 @@
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>example_interfaces</depend>
   <depend>rosidl_default_interfaces</depend>
   
   <exec_depend>passive_sound_localization_msgs</exec_depend>
