@@ -1,0 +1,29 @@
+localization_node:
+  ros__parameters:
+    audio_mixer:
+      sample_rate: 48000
+      chnk_size: 1024
+      record_seconds: 5
+      mic_count: 4
+    vad:
+      enabled: True
+      agressiveness: 2
+      frame_duration_ms: 30
+    transcriber:
+      api_key: ""
+      model_name: "whisper-1"
+      language: "en"
+    localization:
+      speed_of_sound: 343.0
+      sample_rate: 48000
+      fft_size: 1024
+      mic_array_x: [0.0000, 0.4500, 0.0000, -0.4500]
+      mic_array_y: [0.4500, 0.0000, -0.4500, 0.0000]
+    logging:
+      level: "INFO"
+    feature_flags:
+      enable_logging: True
+    openai_websocket:
+      api_key: ""
+      websocket_url: "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
+      instructions: ""
