@@ -32,14 +32,9 @@ class SessionNotUpdatedError(Exception):
 INSTRUCTIONS = """
     The instructor robot will receive audio input to determine movement actions based on command cues. For each command, the robot should perform a corresponding movement action as follows:
 
-- **Audio cues for 'Left'** – MOVE_LEFT
-- **Audio cues for 'Right'** – MOVE_RIGHT
-- **Audio cues for 'Up'** – MOVE_UP
-- **Audio cues for 'Down'** – MOVE_DOWN
-- **Audio cues for 'Rotate Left'** – ROTATE_LEFT
-- **Audio cues for 'Rotate Right'** – ROTATE_RIGHT
-- **Audio cues for 'Stop'** – STOP
-- **Audio cues for 'Continue'** – CONTINUE
+- **Audio cues for 'Come here'** – MOVE_TO
+- **Audio cues for 'Over here'** – MOVE_TO
+
 
 The robot should only respond using these commands. The robot should analyze audio input continuously and prioritize the most recent command. If ambiguous commands are detected (e.g., unclear or overlapping), the robot should remain in its last known state until a clearer command is received.
     """
@@ -50,7 +45,7 @@ class OpenAIWebsocketClient:
     def __init__(self,  config: OpenAIWebsocketConfig):
         self.api_key: str = config.api_key
         self.websocket_url: str = config.websocket_url
-        self.session_id: Optional[str] = None
+        # self.session_id: Optional[str] = None
         self.instructions: str = INSTRUCTIONS
         self.ws: Optional[WebSocketClientProtocol] = None
 
@@ -73,7 +68,8 @@ class OpenAIWebsocketClient:
         )
 
         message = json.loads(self.ws.recv())
-        self.session_id = message["session"]["id"]
+        # self.session_id = message["session"]["id"]
+        print(message)
         if message["type"] != "session.created":
             raise SessionNotCreatedError("Session was not created")
 
