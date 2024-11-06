@@ -6,6 +6,7 @@ import logging
 from typing import Optional
 
 from passive_sound_localization.models.configs.openai_websocket import OpenAIWebsocketConfig
+# from models.configs.openai_websocket import OpenAIWebsocketConfig # Only needed to run with `realtime_audio.py`
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,9 @@ class SessionNotUpdatedError(Exception):
 INSTRUCTIONS = """
     The instructor robot will receive audio input to determine movement actions based on command cues. For each command, the robot should perform a corresponding movement action as follows:
 
-- **Audio cues for 'Left'** – MOVE_LEFT
-- **Audio cues for 'Right'** – MOVE_RIGHT
-- **Audio cues for 'Up'** – MOVE_UP
-- **Audio cues for 'Down'** – MOVE_DOWN
-- **Audio cues for 'Rotate Left'** – ROTATE_LEFT
-- **Audio cues for 'Rotate Right'** – ROTATE_RIGHT
-- **Audio cues for 'Stop'** – STOP
-- **Audio cues for 'Continue'** – CONTINUE
+- **Audio cues for 'Come here'** – MOVE_TO
+- **Audio cues for 'Over here'** – MOVE_TO
+
 
 The robot should only respond using these commands. The robot should analyze audio input continuously and prioritize the most recent command. If ambiguous commands are detected (e.g., unclear or overlapping), the robot should remain in its last known state until a clearer command is received.
     """
@@ -111,6 +107,7 @@ class OpenAIWebsocketClient:
 
     def receive_text_response(self) -> str:
         message = json.loads(self.ws.recv())
+        print(message)
         if message["type"] == "response.text.done":
             return message["text"]
 

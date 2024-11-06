@@ -24,6 +24,7 @@ from passive_sound_localization.models.configs.realtime_streamer import Realtime
 #     FeatureFlagsConfig,
 # ) # Need import paths like this to test audio streaming with `realtime_audio.py`
 # from models.configs.realtime_streamer import RealtimeAudioStreamerConfig # Need import paths like this to test audio streaming with `realtime_audio.py`
+# from models.configs.openai_websocket import OpenAIWebsocketConfig # Need import paths like this to test audio streaming with `realtime_audio.py`
 
 
 from dataclasses import dataclass, field

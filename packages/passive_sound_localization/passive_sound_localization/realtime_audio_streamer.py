@@ -4,6 +4,7 @@ from pyaudio import PyAudio, paInt16, Stream
 import numpy as np
 
 from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+# from models.configs.realtime_streamer import RealtimeAudioStreamerConfig # Only needed to run with `realtime_audio.py`
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,8 @@ class RealtimeAudioStreamer:
         self.audio: Optional[PyAudio] = None
         self.streams: List[Optional[Stream]] = []
         self.streaming: bool = False
+
+        print(self.device_indices)
 
     def __enter__(self):
         self.audio = PyAudio()
