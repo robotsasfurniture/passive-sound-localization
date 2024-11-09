@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Generator, List, Optional
 import soundcard as sc
 import numpy as np
+import threading
 
 # from passive_sound_localization.models.configs.realtime_streamer import (
 #     RealtimeAudioStreamerConfig,
@@ -28,18 +29,31 @@ class RealtimeAudioStreamer:
     def __enter__(self):
         microphones: List[sc._Microphone] = sc.all_microphones()
         self.streams = {
-            device_index: microphones[device_index].record(
-                samplerate=self.sample_rate,
-                channels=self.channels,
-                numframes=self.chunk,
-            )
+            device_index: np.zeros((self.chunk, self.channels), dtype=np.float32)
             for device_index in self.device_indices
         }
         self.streaming = True
+
+        # Start a thread to continuously record audio
+        self.recording_thread = threading.Thread(
+            target=self.record_audio, args=(microphones,)
+        )
+        self.recording_thread.start()
+
         return self
+
+    def record_audio(self, microphones: List[sc._Microphone]):
+        while self.streaming:
+            for device_index in self.device_indices:
+                self.streams[device_index] = microphones[device_index].record(
+                    samplerate=self.sample_rate,
+                    channels=self.channels,
+                    numframes=self.chunk,
+                )
 
     def __exit__(self, *args):
         self.streaming = False
+        self.recording_thread.join()  # Wait for the recording thread to finish
 
     def get_stream(self, device_index: int) -> Optional[bytes]:
         """Retrieve the audio stream for a specific device index."""
