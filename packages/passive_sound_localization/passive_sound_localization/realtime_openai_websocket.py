@@ -29,6 +29,14 @@ class SessionNotCreatedError(Exception):
 class SessionNotUpdatedError(Exception):
     pass
 
+class OpenAIWebsocketError(Exception):
+    def __init__(self, error_code: str, error_message: str) -> None:
+        super().__init__(f"OpenAI websocket erred with error type `{error_code}`: {error_message}")
+    pass
+
+class OpenAIRateLimitError(Exception):
+    pass
+
 
 INSTRUCTIONS = """
     The instructor robot will receive audio input to determine movement actions based on command cues. For each command, the robot should perform a corresponding movement action as follows:
@@ -108,6 +116,10 @@ class OpenAIWebsocketClient:
     def receive_text_response(self) -> str:
         message = json.loads(self.ws.recv())
         print(message)
+        if message["type"] == "error":
+            return OpenAIWebsocketError(error_code=message["error"]["code"], error_message=["error"]["message"])
+        if message["type"] == "response.done" and message["response"]["status_details"]["error"]["code"] == "rate_limit_exceeded":
+            return OpenAIRateLimitError("Hit OpenAI Realtime API rate limit")
         if message["type"] == "response.text.done":
             return message["text"]
 
