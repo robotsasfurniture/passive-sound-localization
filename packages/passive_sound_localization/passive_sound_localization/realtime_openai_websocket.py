@@ -14,15 +14,6 @@ class InvalidWebsocketURIError(Exception):
     def __init__(self, websocket_url: str) -> None:
         super().__init__(f"Invalid Websocker URI was passed: {websocket_url}")
 
-class WebsocketTCPError(Exception):
-    pass
-
-class InvalidWebsocketHandshakeError(Exception):
-    pass
-
-class WebsocketTimeOutError(Exception):
-    pass
-
 class SessionNotCreatedError(Exception):
     def __init__(self) -> None:
         super().__init__("Session was not created")
