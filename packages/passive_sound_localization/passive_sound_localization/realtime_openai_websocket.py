@@ -1,4 +1,4 @@
-from websockets import Data, ConnectionClosed, InvalidHandshake, InvalidURI, WebSocketClientProtocol
+from websockets import WebSocketClientProtocol
 from websockets.sync.client import connect
 import json
 import base64
@@ -14,28 +14,25 @@ class InvalidWebsocketURIError(Exception):
     def __init__(self, websocket_url: str) -> None:
         super().__init__(f"Invalid Websocker URI was passed: {websocket_url}")
 
-class WebsocketTCPError(Exception):
-    pass
-
-class InvalidWebsocketHandshakeError(Exception):
-    pass
-
-class WebsocketTimeOutError(Exception):
-    pass
-
 class SessionNotCreatedError(Exception):
-    pass
+    def __init__(self) -> None:
+        super().__init__("Session was not created")
 
 class SessionNotUpdatedError(Exception):
-    pass
+    def __init__(self) -> None:
+        super().__init__("Session was not updated")
 
 class OpenAIWebsocketError(Exception):
     def __init__(self, error_code: str, error_message: str) -> None:
         super().__init__(f"OpenAI websocket erred with error type `{error_code}`: {error_message}")
-    pass
 
 class OpenAIRateLimitError(Exception):
-    pass
+    def __init__(self) -> None:
+        super().__init__("Hit OpenAI Realtime API rate limit")
+
+class OpenAITimeoutError(Exception):
+    def __init__(self, timeout: float) -> None:
+        super().__init__(f"OpenAI websocket timed out because it did not receive a message in {timeout} seconds")
 
 
 INSTRUCTIONS = """
@@ -79,7 +76,7 @@ class OpenAIWebsocketClient:
         message = json.loads(self.ws.recv())
         self.session_id = message["session"]["id"]
         if message["type"] != "session.created":
-            raise SessionNotCreatedError("Session was not created")
+            raise SessionNotCreatedError()
 
     def _configure_session(self) -> None:
         self.ws.send(json.dumps({
@@ -101,11 +98,12 @@ class OpenAIWebsocketClient:
 
         message = json.loads(self.ws.recv())
         if message["type"] != "session.updated":
-            raise SessionNotUpdatedError("Session was not updated")
+            raise SessionNotUpdatedError()
 
 
 
     def send_audio(self, audio_chunk: bytes) -> None:
+        # Audio needs to be encoded in Base64 before being sent to the OpenAI Realtime API
         audio_b64 = base64.b64encode(audio_chunk).decode()
 
         self.ws.send(json.dumps({
@@ -113,13 +111,26 @@ class OpenAIWebsocketClient:
             "audio": audio_b64
         }))
 
-    def receive_text_response(self) -> str:
-        message = json.loads(self.ws.recv())
+    def receive_text_response(self, timeout:float=0.3) -> str:
+        try:
+            # Tries to receive the next message (in a blocking manner) from the OpenAI websocket
+            # If the message doesn't arrive in 300ms, then it raises a TimeoutError
+            message = json.loads(self.ws.recv(timeout=timeout))
+        except TimeoutError:
+            return OpenAITimeoutError(timeout=timeout)
+        
+        # Print message just to see what we're receiving
         print(message)
+
+        # Checks to see any general errors
         if message["type"] == "error":
             return OpenAIWebsocketError(error_code=message["error"]["code"], error_message=["error"]["message"])
+        
+        # Checks to see whether OpenAI is specifically rate limiting our responses
         if message["type"] == "response.done" and message["response"]["status_details"]["error"]["code"] == "rate_limit_exceeded":
-            return OpenAIRateLimitError("Hit OpenAI Realtime API rate limit")
+            return OpenAIRateLimitError()
+        
+        # Checks to see if an actual text response was sent, and returns the text
         if message["type"] == "response.text.done":
             return message["text"]
 
