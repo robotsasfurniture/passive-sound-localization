@@ -25,11 +25,13 @@ locations = Queue(maxsize=10)
 def send_audio_continuously(client, single_channel_generator):
     print("Threading...")
     for single_channel_audio in single_channel_generator:
+        if single_channel_audio is None:
+            continue
         client.send_audio(single_channel_audio)
 
 
 def receive_text_messages(client, logger):
-    logger.info("OpanAI: Listening to audio stream")
+    logger.info("OpenAI: Listening to audio stream")
     while True:
         try:
             command = client.receive_text_response()
@@ -44,13 +46,16 @@ def receive_text_messages(client, logger):
                 # commands.append(command)
         except Exception as e:
             print(f"Error receiving response: {e}")
-            break  # Exit loop if server disconnects
 
 def realtime_localization(multi_channel_stream, localizer, logger):
     logger.info("Localization: Listening to audio stream")
     try:
         did_get = True
         for audio_data in multi_channel_stream:
+            # Skip calculating if there's any issues with the audio data
+            if audio_data is None:
+                continue
+            
             #  Stream audio data and pass it to the localizer
             localization_stream = localizer.localize_stream(
                 [audio_data[k] for k in audio_data.keys()]
@@ -92,11 +97,8 @@ def command_executor(publisher, logger):
 
 def publish_results(localization_results):
     print(localization_results)
-        
-          
 
 def main():
-    print("Hello world")
     audio_streamer_config = RealtimeAudioStreamerConfig()
     localizer_config = LocalizationConfig()
     websocket_config = OpenAIWebsocketConfig()

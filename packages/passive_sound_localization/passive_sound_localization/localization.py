@@ -1,6 +1,6 @@
 from typing import List, Iterator, Optional, Tuple
-from passive_sound_localization.models.configs.localization import LocalizationConfig
-# from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
+# from passive_sound_localization.models.configs.localization import LocalizationConfig
+from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
 from dataclasses import dataclass
 import numpy as np
 import logging
