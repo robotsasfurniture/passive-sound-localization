@@ -1,6 +1,7 @@
 from typing import List, Iterator, Optional, Tuple
-# from passive_sound_localization.models.configs.localization import LocalizationConfig
-from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
+from passive_sound_localization.models.configs.localization import LocalizationConfig
+
+# from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
 from dataclasses import dataclass
 import numpy as np
 import logging
@@ -10,40 +11,61 @@ logger = logging.getLogger(__name__)
 
 class NoMicrophonePositionsError(Exception):
     """Exception raised when there are no microphone positions"""
+
     def __init__(self) -> None:
         super().__init__("No microphone positions were configured")
 
+
 class TooFewMicrophonePositionsError(Exception):
     """Exception raised when there are less than 2 microphone positions"""
+
     def __init__(self, num_mic_positions: int) -> None:
-        super().__init__(f"There should be at least 2 microphone positions. Currently only {num_mic_positions} microphone position(s) were configured")
+        super().__init__(
+            f"There should be at least 2 microphone positions. Currently only {num_mic_positions} microphone position(s) were configured"
+        )
+
 
 class MicrophonePositionShapeError(Exception):
     """Exception raised when microphone positions don't match (x,y) pairs"""
+
     def __init__(self, mic_position_shape: int) -> None:
-        super().__init__(f"The microphone positions should be in (x,y) pairs. Currently the microphone positions come in pairs of shape {mic_position_shape}")
+        super().__init__(
+            f"The microphone positions should be in (x,y) pairs. Currently the microphone positions come in pairs of shape {mic_position_shape}"
+        )
+
 
 class NoMicrophoneStreamsError(Exception):
     """Exception raised when there are no microphone streams"""
+
     def __init__(self) -> None:
         super().__init__("No microphone streams were passed for localization")
+
     pass
+
 
 class TooFewMicrophoneStreamsError(Exception):
     """Exception raised when there are less than 2 microphone streams"""
+
     def __init__(self, num_mic_streams: int) -> None:
-        super().__init__(f"There should be at least 2 microphone streams. Currently there are only {num_mic_streams} microphone streams")
+        super().__init__(
+            f"There should be at least 2 microphone streams. Currently there are only {num_mic_streams} microphone streams"
+        )
+
 
 class MicrophoneStreamSizeMismatchError(Exception):
     """Exception raised when the number of microphone streams doesn't match the number of microphone positions"""
-    def __init__(self, num_mics:int, num_mic_streams) -> None:
-        super().__init__(f"The number of microphone streams should match the number of microphone positions. Currently there are {num_mic_streams} microphone streams and {num_mics} microphone positions")
+
+    def __init__(self, num_mics: int, num_mic_streams) -> None:
+        super().__init__(
+            f"The number of microphone streams should match the number of microphone positions. Currently there are {num_mic_streams} microphone streams and {num_mics} microphone positions"
+        )
 
 
 @dataclass(frozen=True)
 class LocalizationResult:
     distance: float  # Estimated distance to the sound source in meters
     angle: float  # Estimated angle to the sound source in degrees
+
 
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
@@ -53,18 +75,23 @@ class SoundLocalizer:
         )  # Get mic positions from config
         if self.mic_positions.shape[0] == 0:
             raise NoMicrophonePositionsError()
-        
-        if self.mic_positions.shape[0] < 2:
-            raise TooFewMicrophonePositionsError(num_mic_positions=self.mic_positions.size)
-        
-        if self.mic_positions.shape[1] < 2:
-            raise MicrophonePositionShapeError(mic_position_shape=self.mic_positions.shape[1])
 
-        
-        self.speed_of_sound:float = config.speed_of_sound
-        self.sample_rate:int = config.sample_rate
-        self.fft_size:int = config.fft_size
-        self.num_mics:int = self.mic_positions.shape[0]  # To be set when data is received
+        if self.mic_positions.shape[0] < 2:
+            raise TooFewMicrophonePositionsError(
+                num_mic_positions=self.mic_positions.size
+            )
+
+        if self.mic_positions.shape[1] < 2:
+            raise MicrophonePositionShapeError(
+                mic_position_shape=self.mic_positions.shape[1]
+            )
+
+        self.speed_of_sound: float = config.speed_of_sound
+        self.sample_rate: int = config.sample_rate
+        self.fft_size: int = config.fft_size
+        self.num_mics: int = self.mic_positions.shape[
+            0
+        ]  # To be set when data is received
 
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
@@ -75,7 +102,7 @@ class SoundLocalizer:
         self.phase_shifts = self._compute_all_phase_shifts(self.freqs)
 
         # Initialize buffer for streaming
-        self.buffer:Optional[np.ndarray[np.float32]] = None
+        self.buffer: Optional[np.ndarray[np.float32]] = None
 
     def localize_stream(
         self, multi_channel_stream: List[bytes], num_sources: int = 1
@@ -99,10 +126,12 @@ class SoundLocalizer:
         if num_mic_streams < 2:
             logger.error("At least two microphones are required for localization.")
             raise TooFewMicrophoneStreamsError()
-        
+
         if self.num_mics != num_mic_streams:
-            raise MicrophoneStreamSizeMismatchError(num_mics=self.num_mics, num_mic_streams=num_mic_streams)
-        
+            raise MicrophoneStreamSizeMismatchError(
+                num_mics=self.num_mics, num_mic_streams=num_mic_streams
+            )
+
         # Convert buffers into numpy arrays
         multi_channel_data = [
             np.frombuffer(data, dtype=np.float32) for data in multi_channel_stream
@@ -157,7 +186,9 @@ class SoundLocalizer:
 
         logger.info("Real-time sound source localization completed.")
 
-    def _compute_cross_spectrum(self, mic_signals:np.ndarray[np.float32], fft_size:int=1024) -> np.ndarray[np.complex128]:
+    def _compute_cross_spectrum(
+        self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024
+    ) -> np.ndarray[np.complex128]:
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
 
@@ -170,10 +201,14 @@ class SoundLocalizer:
         cross_spectrum = mic_fft[:, np.newaxis, :] * np.conj(mic_fft[np.newaxis, :, :])
 
         return cross_spectrum
-    
+
     def _generate_circular_grid(
-        self, offset:float=0.45, radius:float=1.0, num_points_radial:int=50, num_points_angular:int=360
-    )-> np.ndarray[np.float32]:
+        self,
+        offset: float = 0.45,
+        radius: float = 1.0,
+        num_points_radial: int = 50,
+        num_points_angular: int = 360,
+    ) -> np.ndarray[np.float32]:
         """Generate a grid of points on a circular plane, optimized for speed."""
         # Create radial distances from 0 to the specified radius
         r = np.linspace(offset, radius + offset, num_points_radial, dtype=np.float32)
@@ -189,16 +224,22 @@ class SoundLocalizer:
         # Return the points stacked as (x, y) pairs
         return np.column_stack((x.ravel(), y.ravel()))
 
-    def _search_best_direction(self, cross_spectrum: np.ndarray[np.complex128]) -> Tuple[np.ndarray, np.float32, int]:
+    def _search_best_direction(
+        self, cross_spectrum: np.ndarray[np.complex128]
+    ) -> Tuple[np.ndarray, np.float32, int]:
         """Search the circular grid for the direction with maximum beamformer output."""
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]
         estimated_distance = np.min(self.distances_to_mics[best_direction_idx])
-        print(f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}")
+        print(
+            f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}"
+        )
         return best_direction, estimated_distance, best_direction_idx
 
-    def _compute_all_phase_shifts(self, freqs: np.ndarray[np.float32]) -> np.ndarray[np.complex128]:
+    def _compute_all_phase_shifts(
+        self, freqs: np.ndarray[np.float32]
+    ) -> np.ndarray[np.complex128]:
         """
         Precompute phase shifts for all grid points, microphone pairs, and frequency bins.
         """
@@ -231,11 +272,15 @@ class SoundLocalizer:
         )  # Shape: (num_grid_points, num_mics)
 
         # Compute delays: distances divided by speed of sound
-        delays = distances_to_mics / self.speed_of_sound  # Shape: (num_grid_points, num_mics)
+        delays = (
+            distances_to_mics / self.speed_of_sound
+        )  # Shape: (num_grid_points, num_mics)
 
         return distances_to_mics, delays
 
-    def _compute_beamformer_energies(self, cross_spectrum: np.ndarray[np.complex128]) -> np.ndarray:
+    def _compute_beamformer_energies(
+        self, cross_spectrum: np.ndarray[np.complex128]
+    ) -> np.ndarray:
         """Compute the beamformer energy given the cross-spectrum and delays."""
         cross_spectrum_expanded = cross_spectrum[np.newaxis, :, :, :]
         # Multiply and sum over mics and frequency bins
@@ -245,7 +290,9 @@ class SoundLocalizer:
         energies = np.abs(np.sum(product, axis=(1, 2, 3)))  # Shape: (num_grid_points,)
         return energies
 
-    def _remove_source_contribution(self, cross_spectrum: np.ndarray[np.complex128], source_idx: int) -> np.ndarray[np.complex128]:
+    def _remove_source_contribution(
+        self, cross_spectrum: np.ndarray[np.complex128], source_idx: int
+    ) -> np.ndarray[np.complex128]:
         """
         Remove the contribution of a localized source using vectorized operations.
         """

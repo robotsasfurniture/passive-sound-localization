@@ -17,8 +17,9 @@ from queue import Queue
 commands = Queue(maxsize=10)
 locations = Queue(maxsize=10)
 
-def send_audio_continuously(client, single_channel_generator):
-    print("Threading...")
+
+def send_audio_continuously(client, single_channel_generator, logger):
+    logger.info("Sending audio to OpenAI")
     for single_channel_audio in single_channel_generator:
         client.send_audio(single_channel_audio)
 
@@ -29,16 +30,15 @@ def receive_text_messages(client, logger):
         try:
             command = client.receive_text_response()
             if command and command.strip() == "MOVE_TO":
-                print(command)
                 logger.info(f"Received command: {command}")
-                
+
                 if commands.full():
                     commands.get()
                     commands.task_done()
                 commands.put(command)
         except Exception as e:
-            print(f"Error receiving response: {e}")
-            break  # Exit loop if server disconnects
+            logger.error(f"Error receiving response: {e}")
+
 
 def realtime_localization(multi_channel_stream, localizer, logger):
     logger.info("Localization: Listening to audio stream")
@@ -53,15 +53,16 @@ def realtime_localization(multi_channel_stream, localizer, logger):
             for localization_results in localization_stream:
                 if locations.full():
                     locations.get()
-                
+
                 locations.put(localization_results)
-            
+
             if did_get:
                 locations.task_done()
             did_get = False
-                
+
     except Exception as e:
         print(f"Realtime Localization error: {e}")
+
 
 def command_executor(publisher, logger):
     logger.info("Executor: listening for command")
@@ -73,7 +74,7 @@ def command_executor(publisher, logger):
                 commands.task_done()
                 if locations.qsize() > 0:
                     publisher(locations.get())
-            
+
                 locations.task_done()
         except Exception as e:
             print(f"Command executor error: {e}")
@@ -100,7 +101,7 @@ class LocalizationNode(Node):
                 ("realtime_streamer.sample_rate", 24000),
                 ("realtime_streamer.channels", 1),
                 ("realtime_streamer.chunk", 1024),
-                ("realtime_streamer.device_indices", [2, 3, 4, 5])
+                ("realtime_streamer.device_indices", [2, 3, 4, 5]),
             ],
         )
 
@@ -133,10 +134,19 @@ class LocalizationNode(Node):
 
             with ThreadPoolExecutor(max_workers=4) as executor:
                 self.logger.info("Threading log")
-                executor.submit(send_audio_continuously, client, single_channel_stream)
+                executor.submit(
+                    send_audio_continuously, client, single_channel_stream, self.logger
+                )
                 executor.submit(receive_text_messages, client, self.logger)
-                executor.submit(realtime_localization, multi_channel_stream, self.localizer, self.logger)
-                executor.submit(command_executor, lambda x: self.publish_results(x), self.logger)
+                executor.submit(
+                    realtime_localization,
+                    multi_channel_stream,
+                    self.localizer,
+                    self.logger,
+                )
+                executor.submit(
+                    command_executor, lambda x: self.publish_results(x), self.logger
+                )
 
     def publish_results(self, localization_results):
         # Publish results to ROS topic

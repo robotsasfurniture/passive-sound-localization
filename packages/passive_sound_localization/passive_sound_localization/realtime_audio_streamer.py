@@ -7,13 +7,13 @@ from pydub import AudioSegment
 from io import BytesIO
 
 
-# from passive_sound_localization.models.configs.realtime_streamer import (
-#     RealtimeAudioStreamerConfig,
-# )
-
-from models.configs.realtime_streamer import (
+from passive_sound_localization.models.configs.realtime_streamer import (
     RealtimeAudioStreamerConfig,
-)  # Only needed to run with `realtime_audio.py`
+)
+
+# from models.configs.realtime_streamer import (
+#     RealtimeAudioStreamerConfig,
+# )  # Only needed to run with `realtime_audio.py`
 
 logger = logging.getLogger(__name__)
 
@@ -87,18 +87,26 @@ class RealtimeAudioStreamer:
 
     def merge_streams(self, streams: List[np.ndarray]) -> np.ndarray:
         return np.sum(streams, axis=0) / len(streams)
-    
-    def resample_stream(self, stream: bytes, target_sample_rate: int = 24000, sample_width: int=2) -> bytes:
-        try:
-            audio = AudioSegment.from_file(BytesIO(stream))
 
-            # Resample to 24kHz mono pcm16
-            return audio.set_frame_rate(target_sample_rate).set_channels(self.channels).set_sample_width(sample_width).raw_data
+    def resample_stream(
+        self, stream: bytes, target_sample_rate: int = 24000, sample_width: int = 2
+    ) -> bytes:
+        try:
+            audio_data_int16 = (stream * 32767).astype(np.int16)
+            audio_segment = AudioSegment(
+                audio_data_int16.tobytes(),
+                frame_rate=self.sample_rate,
+                sample_width=audio_data_int16.dtype.itemsize,
+                channels=self.channels,
+            )
+
+            # Resample the audio to 24000 Hz
+            audio_segment_resampled = audio_segment.set_frame_rate(target_sample_rate)
+            return audio_segment_resampled.get_array_of_samples().tobytes()
 
         except Exception as e:
             print(f"Error in resample_stream: {e}")
             return b""
-
 
     def single_channel_gen(self) -> Generator[Optional[bytes], None, None]:
         try:
