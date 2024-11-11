@@ -3,6 +3,9 @@ from typing import Dict, Generator, List, Optional
 import soundcard as sc
 import numpy as np
 import threading
+from pydub import AudioSegment
+from io import BytesIO
+
 
 # from passive_sound_localization.models.configs.realtime_streamer import (
 #     RealtimeAudioStreamerConfig,
@@ -27,7 +30,7 @@ class RealtimeAudioStreamer:
         print(self.device_indices)
 
     def __enter__(self):
-        microphones: List[sc._Microphone] = sc.all_microphones()
+        microphones = sc.all_microphones()
         self.streams = {
             device_index: np.zeros((self.chunk, self.channels), dtype=np.float32)
             for device_index in self.device_indices
@@ -42,7 +45,7 @@ class RealtimeAudioStreamer:
 
         return self
 
-    def record_audio(self, microphones: List[sc._Microphone]):
+    def record_audio(self, microphones):
         while self.streaming:
             for device_index in self.device_indices:
                 self.streams[device_index] = microphones[device_index].record(
@@ -58,17 +61,21 @@ class RealtimeAudioStreamer:
     def get_stream(self, device_index: int) -> Optional[bytes]:
         """Retrieve the audio stream for a specific device index."""
         if device_index in self.device_indices:
-            return self.streams[device_index].tobytes()
+            return np.nan_to_num(self.streams[device_index]).tobytes()
         else:
             print(f"Device index {device_index} not found.")
             return None
 
-    def multi_channel_gen(self) -> Generator[Dict[int, bytes], None, None]:
+    def multi_channel_gen(self) -> Generator[Optional[Dict[int, bytes]], None, None]:
         try:
             while self.streaming:
                 audio_arrays = []
                 for device_index in self.device_indices:
                     audio_arrays.append(self.get_stream(device_index))
+
+                # Return none if any audio is None or empty bytes
+                if any(audio == b"" or audio is None for audio in audio_arrays):
+                    yield None
 
                 yield {
                     device_index: audio
@@ -80,10 +87,31 @@ class RealtimeAudioStreamer:
 
     def merge_streams(self, streams: List[np.ndarray]) -> np.ndarray:
         return np.sum(streams, axis=0) / len(streams)
+    
+    def resample_stream(self, stream: bytes, target_sample_rate: int = 24000, sample_width: int=2) -> bytes:
+        try:
+            audio = AudioSegment.from_file(BytesIO(stream))
 
-    def single_channel_gen(self) -> Generator[bytes, None, None]:
+            # Resample to 24kHz mono pcm16
+            return audio.set_frame_rate(target_sample_rate).set_channels(self.channels).set_sample_width(sample_width).raw_data
+
+        except Exception as e:
+            print(f"Error in resample_stream: {e}")
+            return b""
+
+
+    def single_channel_gen(self) -> Generator[Optional[bytes], None, None]:
         try:
             while self.streaming:
-                yield self.merge_streams(list(self.streams.values())).tobytes()
+                stream = self.get_stream(self.device_indices[0])
+                if stream == b"" or stream is None:
+                    yield None
+
+                resampled_stream = self.resample_stream(stream)
+
+                if resampled_stream != b"":
+                    yield resampled_stream
+                else:
+                    yield None
         except Exception as e:
             print(f"Error in single_channel_gen: {e}")

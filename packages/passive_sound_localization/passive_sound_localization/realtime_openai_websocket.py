@@ -5,8 +5,8 @@ import base64
 import logging
 from typing import Optional
 
-from passive_sound_localization.models.configs.openai_websocket import OpenAIWebsocketConfig
-# from models.configs.openai_websocket import OpenAIWebsocketConfig # Only needed to run with `realtime_audio.py`
+# from passive_sound_localization.models.configs.openai_websocket import OpenAIWebsocketConfig
+from models.configs.openai_websocket import OpenAIWebsocketConfig # Only needed to run with `realtime_audio.py`
 
 logger = logging.getLogger(__name__)
 
@@ -111,24 +111,24 @@ class OpenAIWebsocketClient:
             "audio": audio_b64
         }))
 
-    def receive_text_response(self, timeout:float=0.3) -> str:
+    def receive_text_response(self, timeout:float=5.0) -> str:
         try:
             # Tries to receive the next message (in a blocking manner) from the OpenAI websocket
             # If the message doesn't arrive in 300ms, then it raises a TimeoutError
             message = json.loads(self.ws.recv(timeout=timeout))
         except TimeoutError:
-            return OpenAITimeoutError(timeout=timeout)
+            raise OpenAITimeoutError(timeout=timeout)
         
         # Print message just to see what we're receiving
-        print(message)
+        # print(message)
 
         # Checks to see any general errors
         if message["type"] == "error":
-            return OpenAIWebsocketError(error_code=message["error"]["code"], error_message=["error"]["message"])
+            raise OpenAIWebsocketError(error_code=message["error"]["code"], error_message=["error"]["message"])
         
         # Checks to see whether OpenAI is specifically rate limiting our responses
         if message["type"] == "response.done" and message["response"]["status_details"]["error"]["code"] == "rate_limit_exceeded":
-            return OpenAIRateLimitError()
+            raise OpenAIRateLimitError()
         
         # Checks to see if an actual text response was sent, and returns the text
         if message["type"] == "response.text.done":
