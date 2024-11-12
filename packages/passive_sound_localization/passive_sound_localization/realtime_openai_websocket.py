@@ -5,13 +5,13 @@ import base64
 import logging
 from typing import Optional
 
-from passive_sound_localization.models.configs.openai_websocket import (
-    OpenAIWebsocketConfig,
-)
-
-# from models.configs.openai_websocket import (
+# from passive_sound_localization.models.configs.openai_websocket import (
 #     OpenAIWebsocketConfig,
-# )  # Only needed to run with `realtime_audio.py`
+# )
+
+from models.configs.openai_websocket import (
+    OpenAIWebsocketConfig,
+)  # Only needed to run with `realtime_audio.py`
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,7 @@ class OpenAIWebsocketClient:
             # Tries to receive the next message (in a blocking manner) from the OpenAI websocket
             # If the message doesn't arrive in 300ms, then it raises a TimeoutError
             message = json.loads(self.ws.recv(timeout=timeout))
+
         except TimeoutError:
             raise OpenAITimeoutError(timeout=timeout)
 
@@ -148,7 +149,9 @@ class OpenAIWebsocketClient:
         # Checks to see whether OpenAI is specifically rate limiting our responses
         if (
             message["type"] == "response.done"
-            and message["response"]["status_details"]["error"]["code"]
+            and message.get("response", {}).get("status_details", {}).get("error", {}).get(
+                "code"
+            )
             == "rate_limit_exceeded"
         ):
             raise OpenAIRateLimitError()
