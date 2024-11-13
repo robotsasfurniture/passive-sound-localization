@@ -11,12 +11,14 @@ from geometry_msgs.msg import Twist
 
 from example_interfaces.msg import Bool
 from passive_sound_localization_msgs.msg import LocalizationResult
+from movement_library.logger import setup_logger
 
 
 class MovementNode(Node):
     def __init__(self):
         super().__init__("movement_node")
-        self.logger = get_logger(__name__)
+        setup_logger()
+        self.logger = logging.getLogger(__name__)
         self.logger.info("Starting movement_node")
         self.cmd_vel_publisher = self.create_publisher(Twist, "rcm/cmd_vel", 1)
         self.enable_publisher = self.create_publisher(Bool, "rcm/enabled", 1)
@@ -30,7 +32,7 @@ class MovementNode(Node):
         self.create_subscription(
             LocalizationResult, "localization_results", self.localizer_callback, 10
         )
-        # self.localizationSubscription={"distance": 0.91, "angle": 180}
+        self.localizationSubscription={"distance": 0, "angle": 0, "executed": False}
         # self.create_subscription(...)
 
         self.loop_time_period = 1.0 / 10.0
@@ -56,12 +58,13 @@ class MovementNode(Node):
 
     def localizer_callback(self, msg):
         self.logger.info("Got a message")
-        angle = 360-msg.angle
+        # angle = 360-msg.angle
+        angle = msg.angle
         distance = msg.distance
         if self.executing:
             pass
         else:
-            self.localizationSubscription={"distance": distance, "angle": angle}
+            self.localizationSubscription={"distance": distance, "angle": angle, "executed": False}
             self.time = 0.0
             self.executing = True
         self.logger.info(f"Got {str(angle)} {str(distance)}")
@@ -70,7 +73,7 @@ class MovementNode(Node):
         # something to stop time from incrementing or reset it when we get a new input
         self.time=self.time+self.loop_time_period
 
-        self.get_logger().info("time: %d"%(self.time))
+        # self.get_logger().info("time: %d"%(self.time))
 
         enableMsg=Bool()
         enableMsg.data=True
@@ -83,6 +86,9 @@ class MovementNode(Node):
         velocityMsg.linear.y=0.0
         velocityMsg.angular.z=0.0
         velocityMsg.linear.x=0.0
+
+        if self.localizationSubscription["executed"]:
+            return
 
         spdx = 0.3
         spdang = 0.5
@@ -110,7 +116,7 @@ class MovementNode(Node):
             velocityMsg.linear.x=0.0
             self.time=0  # not sure if needed
             self.executing=False
-
+            self.localizationSubscription["executed"]=True
         # print(velocityMsg.linear.x)
         # print(velocityMsg.angular.z)
 

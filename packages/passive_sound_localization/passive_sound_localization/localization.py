@@ -117,8 +117,6 @@ class SoundLocalizer:
         Yields:
         - List of LocalizationResult objects for each processed audio chunk.
         """
-        logger.info("Starting real-time sound source localization.")
-
         num_mic_streams = len(multi_channel_stream)
 
         if num_mic_streams == 0:
@@ -183,8 +181,6 @@ class SoundLocalizer:
 
         logger.debug(f"Localization results for current chunk: {results}")
         yield results
-
-        logger.info("Real-time sound source localization completed.")
 
     def _compute_cross_spectrum(
         self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024

@@ -1,125 +1,87 @@
 import logging
-from typing import Dict, Generator, List, Optional
-import soundcard as sc
+from typing import Generator, List
 import numpy as np
+import queue
 import threading
 from pydub import AudioSegment
-from io import BytesIO
+import pyaudio
 
-
-from passive_sound_localization.models.configs.realtime_streamer import (
-    RealtimeAudioStreamerConfig,
-)
-
-# from models.configs.realtime_streamer import (
-#     RealtimeAudioStreamerConfig,
-# )  # Only needed to run with `realtime_audio.py`
+from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
 
 logger = logging.getLogger(__name__)
 
-
 class RealtimeAudioStreamer:
     def __init__(self, config: RealtimeAudioStreamerConfig):
-        self.sample_rate: int = config.sample_rate
-        self.channels: int = config.channels
-        self.chunk: int = config.chunk
-        self.device_indices = config.device_indices
-        self.streams: Dict[int, np.ndarray] = {}
-        self.streaming: bool = False
+        self.mic_indices = config.device_indices
+        self.sample_rate = config.sample_rate
+        self.channels = config.channels
+        self.chunk_size = config.chunk
+        self.is_running = False
+        self.pyaudio_instance = pyaudio.PyAudio()
+        self.streams = []
+        self.audio_queues = [queue.Queue() for _ in self.mic_indices]
 
-        print(self.device_indices)
+        for mic_index in range(self.pyaudio_instance.get_device_count()):
+            device_info = self.pyaudio_instance.get_device_info_by_index(mic_index)
+            logger.info(f"Device info: {device_info}")
+
+        logger.info(f"Mic indices: {self.mic_indices}")
+        for mic_index in self.mic_indices:
+            logger.debug(f"Opening stream for mic index: {mic_index}")
+            stream = self.pyaudio_instance.open(
+                rate=self.sample_rate,
+                channels=self.channels,
+                format=pyaudio.paInt16,
+                input=True,
+                input_device_index=mic_index,
+                frames_per_buffer=self.chunk_size
+            )
+            self.streams.append(stream)
 
     def __enter__(self):
-        microphones = sc.all_microphones()
-        self.streams = {
-            device_index: np.zeros((self.chunk, self.channels), dtype=np.float32)
-            for device_index in self.device_indices
-        }
-        self.streaming = True
-
-        # Start a thread to continuously record audio
-        self.recording_thread = threading.Thread(
-            target=self.record_audio, args=(microphones,)
-        )
-        self.recording_thread.start()
-
+        self.is_running = True
+        self.start_stream_threads()
         return self
 
-    def record_audio(self, microphones):
-        while self.streaming:
-            for device_index in self.device_indices:
-                self.streams[device_index] = microphones[device_index].record(
-                    samplerate=self.sample_rate,
-                    channels=self.channels,
-                    numframes=self.chunk,
-                )
+    def start_stream_threads(self):
+        """Start a thread for each audio stream to continuously push audio data to its queue."""
+        self.stream_threads = []
+        for idx, stream in enumerate(self.streams):
+            thread = threading.Thread(target=self.stream_to_queue, args=(idx, stream), daemon=True)
+            thread.start()
+            self.stream_threads.append(thread)
 
-    def __exit__(self, *args):
-        self.streaming = False
-        self.recording_thread.join()  # Wait for the recording thread to finish
+    def stream_to_queue(self, idx: int, stream):
+        """Reads audio data from the stream and places it in the appropriate queue."""
+        while self.is_running:
+            try:
+                audio_data = stream.read(self.chunk_size, exception_on_overflow=False)
+                self.audio_queues[idx].put(audio_data)
+            except Exception as e:
+                logger.error(f"Error in stream_to_queue for mic {idx}: {e}")
+                self.audio_queues[idx].put(b"")
 
-    def get_stream(self, device_index: int) -> Optional[bytes]:
-        """Retrieve the audio stream for a specific device index."""
-        if device_index in self.device_indices:
-            return np.nan_to_num(self.streams[device_index]).tobytes()
-        else:
-            print(f"Device index {device_index} not found.")
-            return None
+    def audio_generator(self) -> Generator[List[bytes], None, None]:
+        """Thread-safe generator that yields a list of audio data chunks from all microphones."""
+        while self.is_running:
+            yield [q.get() for q in self.audio_queues]
 
-    def multi_channel_gen(self) -> Generator[Optional[Dict[int, bytes]], None, None]:
+    def __exit__(self, *args, **kwargs):
+        self.is_running = False
+        for stream in self.streams:
+            stream.stop_stream()
+            stream.close()
+        self.pyaudio_instance.terminate()
+
+    def resample_stream(self, stream: bytes, target_sample_rate: int = 24000) -> bytes:
         try:
-            while self.streaming:
-                audio_arrays = []
-                for device_index in self.device_indices:
-                    audio_arrays.append(self.get_stream(device_index))
-
-                # Return none if any audio is None or empty bytes
-                if any(audio == b"" or audio is None for audio in audio_arrays):
-                    yield None
-
-                yield {
-                    device_index: audio
-                    for device_index, audio in zip(self.device_indices, audio_arrays)
-                }
-
-        except Exception as e:
-            print(f"Error in multi_channel_gen: {e}")
-
-    def merge_streams(self, streams: List[np.ndarray]) -> np.ndarray:
-        return np.sum(streams, axis=0) / len(streams)
-
-    def resample_stream(
-        self, stream: bytes, target_sample_rate: int = 24000, sample_width: int = 2
-    ) -> bytes:
-        try:
-            audio_data_int16 = (stream * 32767).astype(np.int16)
+            np_stream = np.frombuffer(stream, dtype=np.int16).astype(np.int16).tobytes()
             audio_segment = AudioSegment(
-                audio_data_int16.tobytes(),
-                frame_rate=self.sample_rate,
-                sample_width=audio_data_int16.dtype.itemsize,
-                channels=self.channels,
+                np_stream, frame_rate=self.sample_rate, sample_width=2, channels=1
             )
-
-            # Resample the audio to 24000 Hz
-            audio_segment_resampled = audio_segment.set_frame_rate(target_sample_rate)
-            return audio_segment_resampled.get_array_of_samples().tobytes()
+            audio_segment = audio_segment.set_frame_rate(target_sample_rate).set_channels(1)
+            return audio_segment.raw_data
 
         except Exception as e:
-            print(f"Error in resample_stream: {e}")
+            logger.error(f"Error in resample_stream: {e}")
             return b""
-
-    def single_channel_gen(self) -> Generator[Optional[bytes], None, None]:
-        try:
-            while self.streaming:
-                stream = self.get_stream(self.device_indices[0])
-                if stream == b"" or stream is None:
-                    yield None
-
-                resampled_stream = self.resample_stream(stream)
-
-                if resampled_stream != b"":
-                    yield resampled_stream
-                else:
-                    yield None
-        except Exception as e:
-            print(f"Error in single_channel_gen: {e}")
