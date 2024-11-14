@@ -165,7 +165,7 @@ class SoundLocalizer:
             if best_direction is not None:
                 print(best_direction)
                 # Convert direction into an angle for the result
-                estimated_angle = np.degrees(best_direction[0])
+                estimated_angle = self._calculate_estimated_angle(best_direction=best_direction)
 
                 # Append the localization result for the source
                 results.append(
@@ -219,6 +219,22 @@ class SoundLocalizer:
 
         # Return the points stacked as (x, y) pairs
         return np.column_stack((x.ravel(), y.ravel()))
+    
+    # TODO: Type hinting could be improved
+    def _calculate_estimated_angle(self, best_direction: Tuple[float, float]) -> float:
+        """
+        Calculate the estimated angle based on the best direction and the front microphone.
+
+        Args:
+            best_direction (Tuple[float, float]): A tuple representing the x and y coordinates of the best direction.
+
+        Returns:
+            float: The estimated angle in degrees.
+        """
+        # The difference in x-coordinates is only the x-coordinate of best direction because the x-coordinate of the front microphone will always be zero
+        delta_x = best_direction[0]
+        delta_y = best_direction[1] - self.mic_positions[0, 1]
+        return np.degrees(np.atan2(delta_y, delta_x))
 
     def _search_best_direction(
         self, cross_spectrum: np.ndarray[np.complex128]
