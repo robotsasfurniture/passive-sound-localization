@@ -94,6 +94,10 @@ class MovementNode(Node):
         spdx = 0.3 # Linear speed in m/s
         spdang = 0.5 # Angular speed in rad/s
 
+        # Adjust angular speed based on target direction
+        if self.localizationSubscription["angle"] < 0:
+            spdang = -spdang
+
         # Calculate movement times
         time_xyz = self.calculate_time_xyz(self.localizationSubscription["distance"], spdx)
         time_ang = self.calculate_time_ang(self.localizationSubscription["angle"], spdang)
@@ -121,6 +125,7 @@ class MovementNode(Node):
             self.localizationSubscription["distance"]=0
             self.localizationSubscription["angle"]=0
             velocityMsg.linear.x=0.0
+            velocityMsg.angular.z=0.0
             self.time=0  # not sure if needed
             self.executing=False
             self.localizationSubscription["executed"]=True
