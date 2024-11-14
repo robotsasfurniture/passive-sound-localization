@@ -95,6 +95,7 @@ class SoundLocalizer:
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
 
+        # TODO: Worth paralellizing delays and phase shifts
         # Precompute delays and phase shifts
         self.distances_to_mics, self.delays = self._compute_all_delays()
         self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
@@ -223,6 +224,7 @@ class SoundLocalizer:
         self, cross_spectrum: np.ndarray[np.complex128]
     ) -> Tuple[np.ndarray, np.float32, int]:
         """Search the circular grid for the direction with maximum beamformer output."""
+        # TODO: Expected performance improvement for paralellization is 3-4x (4x ideal, 3x realistic including overhead from data splitting and joining)
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]
