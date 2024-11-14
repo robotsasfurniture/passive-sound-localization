@@ -45,6 +45,45 @@ To run the project in Docker, run this bash command in your terminal:
 poetry run docker
 ```
 
+# Building Project on Lab Laptop
+To build the project on the lab laptop, first make sure that you're in the correct directory:
+
+```bash
+cd ros2_ws/src
+```
+
+Then make sure to start a virtual environment using the following bash command in your terminal:
+
+```bash
+source ../venv/bin/activate
+```
+
+Finally, to build the project, run the following bash command:
+
+```bash
+source /opt/ros/iron/setup.bash && colcon build
+```
+
+# Running Project on Lab Laptop
+To run the project on the lab laptop, make sure that the project has been built before running the project. Refer to the [Building Project on Lab Laptop](#building-project-on-lab-laptop) section, before running the project.
+
+To run the project on the lab laptop, the `passive_sound_localization` and the `movement_library` must be run on **separate** terminals.
+
+## Running Passive Sound Localization ROS package
+To run the `passive_sound_localization` ROS package on the lab laptop, run the following bash command in your terminal:
+
+```bash
+source install/setup.bash && ros2 launch passive_sound_localization localization_launch.py
+```
+
+## Running Movement Library ROS package
+To run the `movement_library` ROS package on the lab laptop, run the following bash command in your terminal:
+
+```bash
+source install/setup.bash && ros2 launch movement_library movement_launch.py
+```
+
+
 # Running Tests
 
 To run the project's automated tests, run this bash command in your terminal:
@@ -52,6 +91,18 @@ To run the project's automated tests, run this bash command in your terminal:
 ```bash
 poetry run pytest
 ```
+
+# Debugging Issues on Lab Laptop
+## Microphone Device Indexing
+This project identifies microphones by their device index to configure the audio input for sound localization accurately. During runtime, if an "Invalid number of channels" error appears, it's likely due to device indices shifting, which can happen when audio settings change. To prevent index shifting, ensure that in **Settings > Sound > Output**, the Output Device is set to "Speakers - Built-in Audio", and in **Settings > Sound > Input**, the Input Device is "Internal Microphone - Built-in Audio".
+
+![Lab Laptop Input and Output Sound Settings](docs/screenshot_sound_input.png)
+
+
+## Microphone Volume Settings
+To ensure optimal performance and accurate sound localization, set each microphone’s volume to maximum in the system’s audio settings. This helps the microphones pick up voices clearly, even at a distance, improving the project's ability to detect and respond to people speaking. Low microphone volume can lead to inaccurate sound localization or missed voice detections. Check each microphone in **Settings > Sound > Input > Volume** to confirm the input volume is set to the highest level before starting the project.
+
+![Microphone Volume Settings on Lab Laptop](docs/screenshot_mic_volume.png)
 
 # Acknowledgements
 
