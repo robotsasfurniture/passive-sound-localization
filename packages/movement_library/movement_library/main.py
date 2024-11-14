@@ -102,14 +102,18 @@ class MovementNode(Node):
         # print(time_ang)
         # print(time_xyz+time_ang+buff)
 
+        # Set angular velocity
         if self.time<=time_ang and self.time>wait:
             velocityMsg.angular.z=spdang
         else:
             velocityMsg.angular.z=0.0
 
+
+        # Set linear velocity
         if self.time<=time_xyz+time_ang+buff and self.time>time_ang+buff:
             velocityMsg.linear.x=spdx
-
+        
+        # Stop the robot after movement
         if self.time>(time_xyz+time_ang+buff):
             self.localizationSubscription["distance"]=0
             self.localizationSubscription["angle"]=0
