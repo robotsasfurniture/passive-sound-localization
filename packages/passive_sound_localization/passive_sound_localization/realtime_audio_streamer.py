@@ -30,7 +30,8 @@ class RealtimeAudioStreamer:
         # Expected speed boost: roughly 9x
         # Original sequential approach: 1.01s
         # Paralellized approach: 0.11s
-        with ThreadPoolExecutor() as executor:
+        # TODO: Might have possible race conditions because PyAudio is not inherently thread-safe
+        with ThreadPoolExecutor(max_workers=len(self.mic_indices)) as executor:
             futures = [executor.submit(self._open_stream, mic_index) for mic_index in self.mic_indices]
             for future in futures:
                 self.streams.append(future.result())
@@ -41,6 +42,18 @@ class RealtimeAudioStreamer:
         return self
     
     def _open_stream(self, mic_index: int) -> pyaudio.Stream:
+        """
+        Opens and returns a PyAudio stream for the specified microphone index.
+
+        This internal method initializes a PyAudio `Stream` object to capture audio input
+        from the microphone device identified by `mic_index`.
+
+        Args:
+            mic_index (int): The index of the microphone device to open the stream from.
+
+        Returns:
+            pyaudio.Stream: An active PyAudio stream object for the specified microphone.
+        """
         logger.debug(f"Opening stream for mic index: {mic_index}")
         return self.pyaudio_instance.open(
             rate=self.sample_rate,
