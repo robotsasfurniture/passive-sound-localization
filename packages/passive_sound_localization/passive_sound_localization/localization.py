@@ -40,8 +40,6 @@ class NoMicrophoneStreamsError(Exception):
     def __init__(self) -> None:
         super().__init__("No microphone streams were passed for localization")
 
-    pass
-
 
 class TooFewMicrophoneStreamsError(Exception):
     """Exception raised when there are less than 2 microphone streams"""
@@ -93,6 +91,7 @@ class SoundLocalizer:
             0
         ]  # To be set when data is received
 
+        # TODO: Eliminate cold start here with either paralellization or persistent caching (or both)
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
 
