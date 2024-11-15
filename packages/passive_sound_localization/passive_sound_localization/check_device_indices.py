@@ -14,7 +14,8 @@ def check_device_indices() -> None:
     pyaudio_instance = pyaudio.PyAudio()
     for mic_index in range(pyaudio_instance.get_device_count()):
         device_info = pyaudio_instance.get_device_info_by_index(mic_index)
-        print(f"Device info: {device_info}")
+        if device_info['maxInputChannels'] > 0 and "USB" in device_info['name']:
+            print(f"Device info: {device_info}")
 
 
 if __name__ == "__main__":
