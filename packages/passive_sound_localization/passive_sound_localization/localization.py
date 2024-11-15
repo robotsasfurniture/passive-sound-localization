@@ -228,7 +228,6 @@ class SoundLocalizer:
         self, cross_spectrum: np.ndarray[np.complex128]
     ) -> Tuple[np.ndarray, np.float32, int]:
         """Search the circular grid for the direction with maximum beamformer output."""
-        # TODO: Expected performance improvement for paralellization is 3-4x (4x ideal, 3x realistic including overhead from data splitting and joining)
         energies = self._compute_beamformer_energies(cross_spectrum)
         best_direction_idx = np.argmax(energies)
         best_direction = self.grid_points[best_direction_idx]

@@ -25,17 +25,11 @@ class RealtimeAudioStreamer:
         self.audio_queues = [queue.Queue() for _ in self.mic_indices]
 
         logger.info(f"Mic indices: {self.mic_indices}")
-        # Expected speed boost: roughly 9x
-        # Original sequential approach: 1.01s
-        # Paralellized approach: 0.11s
-        # TODO: Might have possible race conditions because PyAudio is not inherently thread-safe
 
-        # start_time = time.time()
         with ThreadPoolExecutor(max_workers=len(self.mic_indices)) as executor:
             futures = [executor.submit(self._open_stream, mic_index) for mic_index in self.mic_indices]
             for future in futures:
                 self.streams.append(future.result())
-        # print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
     def __enter__(self):
         self.is_running = True
