@@ -7,6 +7,9 @@ import numpy as np
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
+from joblib import Memory
+
+memory = Memory(location="localization_cache", verbose=0)
 
 logger = logging.getLogger(__name__)
 
@@ -93,12 +96,18 @@ class SoundLocalizer:
         ]  # To be set when data is received
 
         # Generate circular plane of grid points for direction searching
+        #start_time = time.time()
         self.grid_points = self._generate_circular_grid()
+        # self.grid_points = self._generate_circular_grid_cached()
+        #print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
         # Precompute delays and phase shifts
         self.distances_to_mics, self.delays = self._compute_all_delays_parallel(num_chunks=2)
         self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
-        self.phase_shifts = self._compute_all_phase_shifts_parallel(self.freqs, num_chunks=11)
+        start_time = time.time()
+        # self.phase_shifts = self._compute_all_phase_shifts_parallel(self.freqs, num_chunks=11)
+        self.phase_shifts = self._compute_all_phase_shifts_cached(self.freqs, num_chunks=11)
+        print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
         # Initialize buffer for streaming
         self.buffer: Optional[np.ndarray[np.float32]] = None
@@ -196,6 +205,10 @@ class SoundLocalizer:
         cross_spectrum = mic_fft[:, np.newaxis, :] * np.conj(mic_fft[np.newaxis, :, :])
 
         return cross_spectrum
+    
+    def _generate_circular_grid_cached(self):
+        generate_circular_grid = memory.cache(self._generate_circular_grid)
+        return generate_circular_grid()
 
     def _generate_circular_grid(
         self,
@@ -232,6 +245,10 @@ class SoundLocalizer:
             f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}"
         )
         return best_direction, estimated_distance, best_direction_idx
+    
+    def _compute_all_phase_shifts_cached(self, freqs, num_chunks:int=11):
+        compute_all_phase_shifts_parallel = memory.cache(self._compute_all_phase_shifts_parallel)
+        return compute_all_phase_shifts_parallel(freqs, num_chunks)
     
     def _compute_phase_shifts_chunk(self, tau_chunk, freqs):
         return np.exp(
