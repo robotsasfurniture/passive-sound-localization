@@ -98,6 +98,11 @@ This project identifies microphones by their device index to configure the audio
 
 ![Lab Laptop Input and Output Sound Settings](docs/screenshot_sound_input.png)
 
+Optionally, you can run the `check_device_indices` script to check what the current device indices are for the machine. To run `check_device_indices`, following command in a bash terminal:
+```bash
+poetry run python packages/passive_sound_localization/passive_sound_localization/check_device_indices.py
+```
+
 
 ## Microphone Volume Settings
 To ensure optimal performance and accurate sound localization, set each microphone’s volume to maximum in the system’s audio settings. This helps the microphones pick up voices clearly, even at a distance, improving the project's ability to detect and respond to people speaking. Low microphone volume can lead to inaccurate sound localization or missed voice detections. Check each microphone in **Settings > Sound > Input > Volume** to confirm the input volume is set to the highest level before starting the project.
