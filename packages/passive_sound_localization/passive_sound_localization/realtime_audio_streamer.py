@@ -21,10 +21,6 @@ class RealtimeAudioStreamer:
         self.streams = []
         self.audio_queues = [queue.Queue() for _ in self.mic_indices]
 
-        for mic_index in range(self.pyaudio_instance.get_device_count()):
-            device_info = self.pyaudio_instance.get_device_info_by_index(mic_index)
-            logger.info(f"Device info: {device_info}")
-
         logger.info(f"Mic indices: {self.mic_indices}")
         for mic_index in self.mic_indices:
             logger.debug(f"Opening stream for mic index: {mic_index}")
