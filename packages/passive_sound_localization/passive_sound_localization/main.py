@@ -5,6 +5,7 @@ from passive_sound_localization.models.configs import Config
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
 from passive_sound_localization.realtime_openai_websocket import OpenAIWebsocketClient
+from passive_sound_localization.visualizer import Visualizer
 from passive_sound_localization_msgs.msg import LocalizationResult
 
 from concurrent.futures import ThreadPoolExecutor
@@ -19,7 +20,9 @@ commands = Queue(maxsize=10)
 locations = Queue(maxsize=10)
 
 
-def send_audio_continuously(client, streamer: RealtimeAudioStreamer, logger: logging.Logger):
+def send_audio_continuously(
+    client, streamer: RealtimeAudioStreamer, logger: logging.Logger
+):
     logger.info("Sending audio to OpenAI")
     for audio_streams in streamer.audio_generator():
         if audio_streams is None:
@@ -46,7 +49,9 @@ def receive_text_messages(client, logger: logging.Logger):
             logger.error(f"Error receiving response: {e}")
 
 
-def realtime_localization(streamer: RealtimeAudioStreamer, localizer: SoundLocalizer, logger: logging.Logger):
+def realtime_localization(
+    streamer: RealtimeAudioStreamer, localizer: SoundLocalizer, logger: logging.Logger
+):
     logger.info("Localization: Listening to audio stream")
     did_get = False
     for audio_streams in streamer.audio_generator():
@@ -81,13 +86,15 @@ def command_executor(publisher, logger: logging.Logger):
     while True:
         try:
             if commands.qsize() > 0:
-                logger.info(f"Got command, and current location size is: {locations.qsize()}")
+                logger.info(
+                    f"Got command, and current location size is: {locations.qsize()}"
+                )
 
                 commands.get()
                 commands.task_done()
                 if locations.qsize() > 0:
                     location = locations.get()
-                    logger.info(f"Publishing location: {location}") 
+                    logger.info(f"Publishing location: {location}")
                     publisher(location[0])
 
                 locations.task_done()
@@ -133,7 +140,9 @@ class LocalizationNode(Node):
         )
 
         # Initialize components with configurations
-        self.localizer = SoundLocalizer(self.config.localization)
+        self.localizer = SoundLocalizer(
+            self.config.localization, Visualizer(self.config.localization.mic_positions)
+        )
         self.streamer = RealtimeAudioStreamer(self.config.realtime_streamer)
         self.openai_ws_client = OpenAIWebsocketClient(self.config.openai_websocket)
 
@@ -146,9 +155,7 @@ class LocalizationNode(Node):
         with self.streamer as streamer, self.openai_ws_client as client:
             with ThreadPoolExecutor(max_workers=4) as executor:
                 self.logger.info("Threading log")
-                executor.submit(
-                    send_audio_continuously, client, streamer, self.logger
-                )
+                executor.submit(send_audio_continuously, client, streamer, self.logger)
                 executor.submit(receive_text_messages, client, self.logger)
                 executor.submit(
                     realtime_localization,
@@ -166,9 +173,7 @@ class LocalizationNode(Node):
         msg = LocalizationResult()
         msg.angle = float(localization_results.angle)
         msg.distance = float(localization_results.distance)
-        self.logger.info(
-            f"Publishing: angle={msg.angle}, distance={msg.distance}"
-        )
+        self.logger.info(f"Publishing: angle={msg.angle}, distance={msg.distance}")
         self.publisher.publish(msg)
 
 
