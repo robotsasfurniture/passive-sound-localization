@@ -96,16 +96,12 @@ class SoundLocalizer:
         ]  # To be set when data is received
 
         # Generate circular plane of grid points for direction searching
-        #start_time = time.time()
         self.grid_points = self._generate_circular_grid()
-        # self.grid_points = self._generate_circular_grid_cached()
-        #print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
         # Precompute delays and phase shifts
         self.distances_to_mics, self.delays = self._compute_all_delays_parallel(num_chunks=2)
         self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
         start_time = time.time()
-        # self.phase_shifts = self._compute_all_phase_shifts_parallel(self.freqs, num_chunks=11)
         self.phase_shifts = self._compute_all_phase_shifts_cached(self.freqs, num_chunks=11)
         print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
@@ -205,10 +201,6 @@ class SoundLocalizer:
         cross_spectrum = mic_fft[:, np.newaxis, :] * np.conj(mic_fft[np.newaxis, :, :])
 
         return cross_spectrum
-    
-    def _generate_circular_grid_cached(self):
-        generate_circular_grid = memory.cache(self._generate_circular_grid)
-        return generate_circular_grid()
 
     def _generate_circular_grid(
         self,
