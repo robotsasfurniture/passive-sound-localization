@@ -1,10 +1,12 @@
 from typing import List, Iterator, Optional, Tuple
-from passive_sound_localization.models.configs.localization import LocalizationConfig
+# from passive_sound_localization.models.configs.localization import LocalizationConfig
 
-# from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
+from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
 from dataclasses import dataclass
 import numpy as np
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +69,6 @@ class LocalizationResult:
 
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig):
-        # TODO: Make sure that mic position ordering matches the ordering of the microphone streams/device indices
         self.mic_positions = np.array(
             config.mic_positions, dtype=np.float32
         )  # Get mic positions from config
@@ -91,15 +92,13 @@ class SoundLocalizer:
             0
         ]  # To be set when data is received
 
-        # TODO: Eliminate cold start here with either paralellization or persistent caching (or both)
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
 
-        # TODO: Worth paralellizing delays and phase shifts
         # Precompute delays and phase shifts
-        self.distances_to_mics, self.delays = self._compute_all_delays()
+        self.distances_to_mics, self.delays = self._compute_all_delays_parallel(num_chunks=2)
         self.freqs = np.fft.rfftfreq(self.fft_size, d=1.0 / self.sample_rate)
-        self.phase_shifts = self._compute_all_phase_shifts(self.freqs)
+        self.phase_shifts = self._compute_all_phase_shifts_parallel(self.freqs, num_chunks=11)
 
         # Initialize buffer for streaming
         self.buffer: Optional[np.ndarray[np.float32]] = None
@@ -233,46 +232,49 @@ class SoundLocalizer:
             f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}"
         )
         return best_direction, estimated_distance, best_direction_idx
+    
+    def _compute_phase_shifts_chunk(self, tau_chunk, freqs):
+        return np.exp(
+            -1j * 2 * np.pi * tau_chunk[:, :, :, np.newaxis] * freqs[np.newaxis, np.newaxis, np.newaxis, :]
+        )
+    
+    def _compute_all_phase_shifts_parallel(self, freqs, num_chunks:int=11):
+        # num_chunks = 2 # Adjust based on CPU cores
+        tau_chunks = np.array_split(
+            self.delays[:, :, np.newaxis] - self.delays[:, np.newaxis, :], num_chunks, axis=0
+        )
 
-    def _compute_all_phase_shifts(
-        self, freqs: np.ndarray[np.float32]
-    ) -> np.ndarray[np.complex128]:
-        """
-        Precompute phase shifts for all grid points, microphone pairs, and frequency bins.
-        """
-        # Compute tau (time delays between microphone pairs for all grid points)
-        tau = (
-            self.delays[:, :, np.newaxis] - self.delays[:, np.newaxis, :]
-        )  # Shape: (num_grid_points, num_mics, num_mics)
+        results = []
+        with ThreadPoolExecutor(max_workers=num_chunks) as executor:
+            futures = [executor.submit(self._compute_phase_shifts_chunk, chunk, freqs) for chunk in tau_chunks]
+            for future in futures:
+                results.append(future.result())
 
-        # Compute phase shifts for all frequencies
-        phase_shifts = np.exp(
-            -1j
-            * 2
-            * np.pi
-            * tau[:, :, :, np.newaxis]
-            * freqs[np.newaxis, np.newaxis, np.newaxis, :]
-        )  # Shape: (num_grid_points, num_mics, num_mics, num_freq_bins)
+        # Combine results from all chunks
+        phase_shifts = np.concatenate(results, axis=0)
         return phase_shifts
 
-    def _compute_all_delays(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Precompute delays for all grid points and microphones.
-        """
-        # Compute distances from each microphone to each grid point
-        mic_positions_2d = self.mic_positions[:, :2]  # Shape: (num_mics, 2)
-
-        # Calculate distances between microphones and grid points
-        distances_to_mics = np.linalg.norm(
-            mic_positions_2d[np.newaxis, :, :] - self.grid_points[:, np.newaxis, :],
+    def _compute_delays_chunk(self, grid_points_chunk, mic_positions_2d, speed_of_sound):
+        distances_to_mics_chunk = np.linalg.norm(
+            mic_positions_2d[np.newaxis, :, :] - grid_points_chunk[:, np.newaxis, :],
             axis=2,
-        )  # Shape: (num_grid_points, num_mics)
+        )
+        delays_chunk = distances_to_mics_chunk / speed_of_sound
+        return distances_to_mics_chunk, delays_chunk
+    
+    def _compute_all_delays_parallel(self, num_chunks:int=11):
+        # Split grid points into chunks
+        grid_chunks = np.array_split(self.grid_points, num_chunks)
 
-        # Compute delays: distances divided by speed of sound
-        delays = (
-            distances_to_mics / self.speed_of_sound
-        )  # Shape: (num_grid_points, num_mics)
+        results = []
+        with ThreadPoolExecutor(max_workers=num_chunks) as executor:
+            futures = [executor.submit(self._compute_delays_chunk, chunk, self.mic_positions[:, :2], self.speed_of_sound) for chunk in grid_chunks]
+            for future in futures:
+                results.append(future.result())
 
+        # Combine results from all chunks
+        distances_to_mics = np.vstack([result[0] for result in results])
+        delays = np.vstack([result[1] for result in results])
         return distances_to_mics, delays
 
     def _compute_beamformer_energies(
