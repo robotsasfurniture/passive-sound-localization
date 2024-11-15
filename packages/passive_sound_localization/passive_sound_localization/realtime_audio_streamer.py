@@ -6,8 +6,10 @@ import threading
 from pydub import AudioSegment
 import pyaudio
 from concurrent.futures import ThreadPoolExecutor
+import time
 
-from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+# from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+from models.configs.realtime_streamer import RealtimeAudioStreamerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +26,22 @@ class RealtimeAudioStreamer:
 
 
         # TODO: Could cover this in a feature flag or something since it's only for debugging
-        for mic_index in range(self.pyaudio_instance.get_device_count()):
-            device_info = self.pyaudio_instance.get_device_info_by_index(mic_index)
-            logger.info(f"Device info: {device_info}")
+        # for mic_index in range(self.pyaudio_instance.get_device_count()):
+        #     device_info = self.pyaudio_instance.get_device_info_by_index(mic_index)
+        #     logger.info(f"Device info: {device_info}")
 
         logger.info(f"Mic indices: {self.mic_indices}")
         # Expected speed boost: roughly 9x
         # Original sequential approach: 1.01s
         # Paralellized approach: 0.11s
         # TODO: Might have possible race conditions because PyAudio is not inherently thread-safe
+
+        # start_time = time.time()
         with ThreadPoolExecutor(max_workers=len(self.mic_indices)) as executor:
             futures = [executor.submit(self._open_stream, mic_index) for mic_index in self.mic_indices]
             for future in futures:
                 self.streams.append(future.result())
+        # print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
     def __enter__(self):
         self.is_running = True
