@@ -19,7 +19,7 @@ commands = Queue(maxsize=10)
 locations = Queue(maxsize=10)
 
 
-def send_audio_continuously(client, streamer: RealtimeAudioStreamer, logger: logging.Logger):
+def send_audio_continuously(client: OpenAIWebsocketClient, streamer: RealtimeAudioStreamer, logger: logging.Logger):
     logger.info("Sending audio to OpenAI")
     for audio_streams in streamer.audio_generator():
         if audio_streams is None:

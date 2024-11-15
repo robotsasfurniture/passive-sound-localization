@@ -3,3 +3,4 @@ hydra_outputs
 .DS_Store
 .env
 passive_sound_localization/outputs/
+localization_cache

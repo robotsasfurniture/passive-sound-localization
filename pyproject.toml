@@ -17,6 +17,7 @@ python-dotenv = "^1.0.1"
 websockets = "^13.1"
 soundcard = "^0.4.3"
 pydub = "^0.25.1"
+joblib = "^1.4.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"

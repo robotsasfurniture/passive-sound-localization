@@ -5,8 +5,11 @@ import queue
 import threading
 from pydub import AudioSegment
 import pyaudio
+from concurrent.futures import ThreadPoolExecutor
+import time
 
-from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+# from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+from models.configs.realtime_streamer import RealtimeAudioStreamerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +25,45 @@ class RealtimeAudioStreamer:
         self.audio_queues = [queue.Queue() for _ in self.mic_indices]
 
         logger.info(f"Mic indices: {self.mic_indices}")
-        for mic_index in self.mic_indices:
-            logger.debug(f"Opening stream for mic index: {mic_index}")
-            stream = self.pyaudio_instance.open(
-                rate=self.sample_rate,
-                channels=self.channels,
-                format=pyaudio.paInt16,
-                input=True,
-                input_device_index=mic_index,
-                frames_per_buffer=self.chunk_size
-            )
-            self.streams.append(stream)
+        # Expected speed boost: roughly 9x
+        # Original sequential approach: 1.01s
+        # Paralellized approach: 0.11s
+        # TODO: Might have possible race conditions because PyAudio is not inherently thread-safe
+
+        # start_time = time.time()
+        with ThreadPoolExecutor(max_workers=len(self.mic_indices)) as executor:
+            futures = [executor.submit(self._open_stream, mic_index) for mic_index in self.mic_indices]
+            for future in futures:
+                self.streams.append(future.result())
+        # print(f"Total time: {(time.time() - start_time) * 1000}ms")
 
     def __enter__(self):
         self.is_running = True
         self.start_stream_threads()
         return self
+    
+    def _open_stream(self, mic_index: int) -> pyaudio.Stream:
+        """
+        Opens and returns a PyAudio stream for the specified microphone index.
+
+        This internal method initializes a PyAudio `Stream` object to capture audio input
+        from the microphone device identified by `mic_index`.
+
+        Args:
+            mic_index (int): The index of the microphone device to open the stream from.
+
+        Returns:
+            pyaudio.Stream: An active PyAudio stream object for the specified microphone.
+        """
+        logger.debug(f"Opening stream for mic index: {mic_index}")
+        return self.pyaudio_instance.open(
+            rate=self.sample_rate,
+            channels=self.channels,
+            format=pyaudio.paInt16,
+            input=True,
+            input_device_index=mic_index,
+            frames_per_buffer=self.chunk_size
+        )
 
     def start_stream_threads(self):
         """Start a thread for each audio stream to continuously push audio data to its queue."""

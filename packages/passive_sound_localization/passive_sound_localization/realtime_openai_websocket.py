@@ -61,7 +61,6 @@ The robot should only respond using these commands. The robot should analyze aud
     """
 
 
-# TODO: Make it take in Hydra config
 class OpenAIWebsocketClient:
     def __init__(self, config: OpenAIWebsocketConfig):
         self.api_key: str = config.api_key
