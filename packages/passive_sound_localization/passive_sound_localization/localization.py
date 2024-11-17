@@ -244,7 +244,8 @@ class SoundLocalizer:
         # Compute the power spectral density (PSD)
         mic_psd = np.abs(mic_fft) ** 2
 
-        # Compute the noise estimate as the time average of the PSD 
+        # Compute the noise estimate as the time average of the PSD
+        # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate 
         noise_estimate = np.mean(mic_psd, axis=1, keepdims=True)
 
         # Compute the noise masking weight
