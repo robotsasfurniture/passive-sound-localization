@@ -1,10 +1,16 @@
 from typing import List, Iterator, Optional, Tuple
-from passive_sound_localization.models.configs.localization import LocalizationConfig
 
-# from models.configs.localization import LocalizationConfig # Only needed to run with `realtime_audio.py`
+# from passive_sound_localization.models.configs.localization import LocalizationConfig
+# from passive_sound_localization.visualizer import Visualizer
+
+from models.configs.localization import (
+    LocalizationConfig,
+)  # Only needed to run with `realtime_audio.py`
+from visualizer import Visualizer
 from dataclasses import dataclass
 import numpy as np
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +74,7 @@ class LocalizationResult:
 
 
 class SoundLocalizer:
-    def __init__(self, config: LocalizationConfig):
+    def __init__(self, config: LocalizationConfig, visualizer: Visualizer):
         # TODO: Make sure that mic position ordering matches the ordering of the microphone streams/device indices
         self.mic_positions = np.array(
             config.mic_positions, dtype=np.float32
@@ -92,9 +98,14 @@ class SoundLocalizer:
         self.num_mics: int = self.mic_positions.shape[
             0
         ]  # To be set when data is received
+        self.visualize: bool = config.visualize
 
         # Generate circular plane of grid points for direction searching
         self.grid_points = self._generate_circular_grid()
+        self.visualizer = visualizer
+
+        if self.visualize:
+            self.visualizer.set_grid_points(self.grid_points)
 
         # Precompute delays and phase shifts
         self.distances_to_mics, self.delays = self._compute_all_delays()
@@ -103,9 +114,12 @@ class SoundLocalizer:
 
         # Initialize buffer for streaming
         self.buffer: Optional[np.ndarray[np.float32]] = None
+        self.total_results = []
 
     def localize_stream(
-        self, multi_channel_stream: List[bytes], num_sources: int = 1
+        self,
+        multi_channel_stream: List[bytes],
+        num_sources: int = 1,
     ) -> Iterator[List[LocalizationResult]]:
         """
         Performs real-time sound source localization on streaming multi-channel audio data.
@@ -163,7 +177,6 @@ class SoundLocalizer:
                 self._search_best_direction(cross_spectrum)
             )
             if best_direction is not None:
-                print(best_direction)
                 # Convert direction into an angle for the result
                 estimated_angle = self._calculate_estimated_angle(best_direction=best_direction)
 
@@ -178,6 +191,31 @@ class SoundLocalizer:
                 cross_spectrum = self._remove_source_contribution(
                     cross_spectrum, source_idx
                 )
+
+        self.total_results.extend(results)
+
+        if len(self.total_results) > 5:
+            average_distance = np.mean(
+                [result.distance for result in self.total_results]
+            )
+            average_angle = np.mean([result.angle for result in self.total_results])
+            self.total_results.pop(0)
+
+        if self.visualize:
+            logger.info(
+                f"Visualizing localization results for source {_} with angle {estimated_angle} and distance {estimated_distance}"
+            )
+
+            average_point = self.compute_cartesian_coordinates(
+                average_distance, average_angle
+            )
+
+            self.visualizer.plot(
+                angle=estimated_angle,
+                distance=estimated_distance,
+                selected_grid_point=self.grid_points[source_idx],
+                average_point=average_point,
+            )
 
         logger.debug(f"Localization results for current chunk: {results}")
         yield results
@@ -235,6 +273,11 @@ class SoundLocalizer:
         delta_x = best_direction[0]
         delta_y = best_direction[1] - self.mic_positions[0, 1]
         return np.degrees(np.atan2(delta_y, delta_x))
+
+    def _calculate_estimated_angle(self, best_direction: Tuple[float, float]) -> float:
+        delta_x = best_direction[0]
+        delta_y = best_direction[1] - self.mic_positions[0, 1]
+        return np.degrees(np.arctan2(delta_y, delta_x))
 
     def _search_best_direction(
         self, cross_spectrum: np.ndarray[np.complex128]

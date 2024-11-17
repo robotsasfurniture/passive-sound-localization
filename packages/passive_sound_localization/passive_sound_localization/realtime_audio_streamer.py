@@ -6,9 +6,14 @@ import threading
 from pydub import AudioSegment
 import pyaudio
 
-from passive_sound_localization.models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+# from passive_sound_localization.models.configs.realtime_streamer import (
+#     RealtimeAudioStreamerConfig,
+# )
+from models.configs.realtime_streamer import RealtimeAudioStreamerConfig
+
 
 logger = logging.getLogger(__name__)
+
 
 class RealtimeAudioStreamer:
     def __init__(self, config: RealtimeAudioStreamerConfig):
@@ -21,10 +26,6 @@ class RealtimeAudioStreamer:
         self.streams = []
         self.audio_queues = [queue.Queue() for _ in self.mic_indices]
 
-        for mic_index in range(self.pyaudio_instance.get_device_count()):
-            device_info = self.pyaudio_instance.get_device_info_by_index(mic_index)
-            logger.info(f"Device info: {device_info}")
-
         logger.info(f"Mic indices: {self.mic_indices}")
         for mic_index in self.mic_indices:
             logger.debug(f"Opening stream for mic index: {mic_index}")
@@ -34,7 +35,7 @@ class RealtimeAudioStreamer:
                 format=pyaudio.paInt16,
                 input=True,
                 input_device_index=mic_index,
-                frames_per_buffer=self.chunk_size
+                frames_per_buffer=self.chunk_size,
             )
             self.streams.append(stream)
 
@@ -47,7 +48,9 @@ class RealtimeAudioStreamer:
         """Start a thread for each audio stream to continuously push audio data to its queue."""
         self.stream_threads = []
         for idx, stream in enumerate(self.streams):
-            thread = threading.Thread(target=self.stream_to_queue, args=(idx, stream), daemon=True)
+            thread = threading.Thread(
+                target=self.stream_to_queue, args=(idx, stream), daemon=True
+            )
             thread.start()
             self.stream_threads.append(thread)
 
@@ -79,7 +82,9 @@ class RealtimeAudioStreamer:
             audio_segment = AudioSegment(
                 np_stream, frame_rate=self.sample_rate, sample_width=2, channels=1
             )
-            audio_segment = audio_segment.set_frame_rate(target_sample_rate).set_channels(1)
+            audio_segment = audio_segment.set_frame_rate(
+                target_sample_rate
+            ).set_channels(1)
             return audio_segment.raw_data
 
         except Exception as e:
