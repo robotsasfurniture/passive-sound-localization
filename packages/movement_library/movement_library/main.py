@@ -89,9 +89,16 @@ class MovementNode(Node):
 
         if self.localizationSubscription["executed"]:
             return
+        
+        # Set speeds
+        spdx = 0.3 # Linear speed in m/s
+        spdang = 0.5 # Angular speed in rad/s
 
-        spdx = 0.3
-        spdang = 0.5
+        # Adjust angular speed based on target direction
+        if self.localizationSubscription["angle"] < 0:
+            spdang = -spdang
+
+        # Calculate movement times
         time_xyz = self.calculate_time_xyz(self.localizationSubscription["distance"], spdx)
         time_ang = self.calculate_time_ang(self.localizationSubscription["angle"], spdang)
         buff = 1
@@ -102,18 +109,23 @@ class MovementNode(Node):
         # print(time_ang)
         # print(time_xyz+time_ang+buff)
 
+        # Set angular velocity
         if self.time<=time_ang and self.time>wait:
             velocityMsg.angular.z=spdang
         else:
             velocityMsg.angular.z=0.0
 
+
+        # Set linear velocity
         if self.time<=time_xyz+time_ang+buff and self.time>time_ang+buff:
             velocityMsg.linear.x=spdx
-
+        
+        # Stop the robot after movement
         if self.time>(time_xyz+time_ang+buff):
             self.localizationSubscription["distance"]=0
             self.localizationSubscription["angle"]=0
             velocityMsg.linear.x=0.0
+            velocityMsg.angular.z=0.0
             self.time=0  # not sure if needed
             self.executing=False
             self.localizationSubscription["executed"]=True
