@@ -223,7 +223,17 @@ class SoundLocalizer:
     def _compute_cross_spectrum(
         self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024, gamma: float = 0.1
     ) -> np.ndarray[np.complex128]:
-        """Compute the cross-power spectrum between microphone pairs with spectral weighting."""
+        """
+        Compute the cross-power spectrum between microphone pairs with noise weighting.
+        
+        Args:
+            mic_signals (np.ndarray): Microphone signals with shape (num_mics, num_samples).
+            fft_size (int): Size of the FFT.
+            gamma (float): Exponent for the noise weighting. Typically 0 < gamma < 1.
+        
+        Returns:
+            np.ndarray: Cross-power spectrum with noise masking applied.
+        """
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
 
         mic_signals = mic_signals.astype(np.float64)
