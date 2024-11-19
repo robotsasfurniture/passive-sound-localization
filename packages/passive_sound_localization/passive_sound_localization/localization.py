@@ -237,7 +237,7 @@ class SoundLocalizer:
         yield results
 
     def _compute_cross_spectrum(
-        self, mic_signals: np.ndarray[Int], fft_size: int = 1024
+        self, mic_signals: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
     ) -> np.ndarray[Complex]:
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
