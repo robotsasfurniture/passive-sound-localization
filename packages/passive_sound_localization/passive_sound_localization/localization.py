@@ -221,20 +221,45 @@ class SoundLocalizer:
         yield results
 
     def _compute_cross_spectrum(
-        self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024
+        self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024, gamma: float = 0.1
     ) -> np.ndarray[np.complex128]:
-        """Compute the cross-power spectrum between microphone pairs."""
+        """
+        Compute the cross-power spectrum between microphone pairs with noise weighting.
+        
+        Args:
+            mic_signals (np.ndarray): Microphone signals with shape (num_mics, num_samples).
+            fft_size (int): Size of the FFT.
+            gamma (float): Exponent for the noise weighting. Typically 0 < gamma < 1.
+        
+        Returns:
+            np.ndarray: Cross-power spectrum with noise masking applied.
+        """
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
 
         mic_signals = mic_signals.astype(np.float64)
 
-        # Compute the FFT of each microphone signal
+        # Compute the fast fourier transform (FFT) of each microphone signal
         mic_fft = np.fft.rfft(mic_signals, fft_size)
+
+        # Compute the power spectral density (PSD)
+        mic_psd = np.abs(mic_fft) ** 2
+
+        # Compute the noise estimate as the time average of the PSD
+        # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate 
+        noise_estimate = np.mean(mic_psd, axis=1, keepdims=True)
+
+        # Compute the noise masking weight
+        weight = np.where(
+            mic_psd <= noise_estimate,
+            1,
+            (mic_psd / noise_estimate) ** gamma
+        )
 
         # Compute the cross-power spectrum for each microphone pair using broadcasting
         cross_spectrum = mic_fft[:, np.newaxis, :] * np.conj(mic_fft[np.newaxis, :, :])
 
-        return cross_spectrum
+        # Apply the noise weights to the cross spectrum
+        return cross_spectrum * weight[:, np.newaxis, :]
 
     def _generate_circular_grid(
         self,
