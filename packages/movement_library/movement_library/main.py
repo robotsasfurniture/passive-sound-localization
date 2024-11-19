@@ -32,7 +32,7 @@ class MovementNode(Node):
         self.create_subscription(
             LocalizationResult, "localization_results", self.localizer_callback, 10
         )
-        self.localizationSubscription={"distance": 0, "angle": 0, "executed": False}
+        self.localizationSubscription = {"distance": 0, "angle": 0, "executed": False}
         # self.create_subscription(...)
 
         self.loop_time_period = 1.0 / 10.0
@@ -64,71 +64,78 @@ class MovementNode(Node):
         if self.executing:
             pass
         else:
-            self.localizationSubscription={"distance": distance, "angle": angle, "executed": False}
+            self.localizationSubscription = {
+                "distance": distance,
+                "angle": angle,
+                "executed": False,
+            }
             self.time = 0.0
             self.executing = True
         self.logger.info(f"Got {str(angle)} {str(distance)}")
 
     def loop(self):
         # something to stop time from incrementing or reset it when we get a new input
-        self.time=self.time+self.loop_time_period
+        self.time = self.time + self.loop_time_period
 
         # self.get_logger().info("time: %d"%(self.time))
 
-        enableMsg=Bool()
-        enableMsg.data=True
+        enableMsg = Bool()
+        enableMsg.data = True
         self.enable_publisher.publish(enableMsg)
 
-        velocityMsg=Twist()
-        velocityMsg.linear.z=0.0
-        velocityMsg.angular.x=0.0
-        velocityMsg.angular.y=0.0
-        velocityMsg.linear.y=0.0
-        velocityMsg.angular.z=0.0
-        velocityMsg.linear.x=0.0
+        velocityMsg = Twist()
+        velocityMsg.linear.z = 0.0
+        velocityMsg.angular.x = 0.0
+        velocityMsg.angular.y = 0.0
+        velocityMsg.linear.y = 0.0
+        velocityMsg.angular.z = 0.0
+        velocityMsg.linear.x = 0.0
 
         if self.localizationSubscription["executed"]:
             return
-        
+
         # Set speeds
-        spdx = 0.3 # Linear speed in m/s
-        spdang = 0.5 # Angular speed in rad/s
+        spdx = 0.3  # Linear speed in m/s
+        spdang = 0.5  # Angular speed in rad/s
 
         # Adjust angular speed based on target direction
         if self.localizationSubscription["angle"] < 0:
             spdang = -spdang
 
         # Calculate movement times
-        time_xyz = self.calculate_time_xyz(self.localizationSubscription["distance"], spdx)
-        time_ang = self.calculate_time_ang(self.localizationSubscription["angle"], spdang)
+        time_xyz = self.calculate_time_xyz(
+            self.localizationSubscription["distance"], spdx
+        )
+        time_ang = self.calculate_time_ang(
+            self.localizationSubscription["angle"], spdang
+        )
         buff = 1
         wait = 2
 
-        time_ang = time_ang+wait
+        time_ang = time_ang + wait
         # print(time_xyz)
         # print(time_ang)
         # print(time_xyz+time_ang+buff)
 
         # Set angular velocity
-        if self.time<=time_ang and self.time>wait:
-            velocityMsg.angular.z=spdang
+        if self.time <= time_ang and self.time > wait:
+            velocityMsg.angular.z = spdang
         else:
-            velocityMsg.angular.z=0.0
-
+            velocityMsg.angular.z = 0.0
 
         # Set linear velocity
-        if self.time<=time_xyz+time_ang+buff and self.time>time_ang+buff:
-            velocityMsg.linear.x=spdx
-        
+        if self.time <= time_xyz + time_ang + buff and self.time > time_ang + buff:
+            velocityMsg.linear.x = spdx
+
         # Stop the robot after movement
-        if self.time>(time_xyz+time_ang+buff):
-            self.localizationSubscription["distance"]=0
-            self.localizationSubscription["angle"]=0
-            velocityMsg.linear.x=0.0
-            velocityMsg.angular.z=0.0
-            self.time=0  # not sure if needed
-            self.executing=False
-            self.localizationSubscription["executed"]=True
+        if self.time > (time_xyz + time_ang + buff):
+            self.localizationSubscription["distance"] = 0
+            self.localizationSubscription["angle"] = 0
+            velocityMsg.linear.x = 0.0
+            velocityMsg.angular.z = 0.0
+            self.time = 0  # not sure if needed
+            self.executing = False
+            self.localizationSubscription["executed"] = True
         # print(velocityMsg.linear.x)
         # print(velocityMsg.angular.z)
 
@@ -153,17 +160,17 @@ if __name__ == "__main__":
 # class MoveRobot(Node):
 #     def __init__(self):
 #         super().__init__('move_robot_node')
-        
+
 #         # Subscriber to get data (e.g., sensor distance)
 #         self.subscription = self.create_subscription(
 #             Float32,  # Adjust type based on your topic
 #             'sensor_topic',  # Replace with the actual topic name
 #             self.sensor_callback,
 #             10)
-        
+
 #         # Publisher to control the robot
 #         self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        
+
 #         # Initializing a timer for continuous control updates
 #         timer_period = 0.1  # seconds
 #         self.timer = self.create_timer(timer_period, self.update_control)
@@ -194,12 +201,12 @@ if __name__ == "__main__":
 # def main(args=None):
 #     rclpy.init(args=args)
 #     move_robot_node = MoveRobot()
-    
+
 #     try:
 #         rclpy.spin(move_robot_node)
 #     except KeyboardInterrupt:
 #         pass
-    
+
 #     # Shutdown and cleanup
 #     move_robot_node.destroy_node()
 #     rclpy.shutdown()

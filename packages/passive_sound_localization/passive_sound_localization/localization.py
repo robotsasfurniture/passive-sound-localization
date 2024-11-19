@@ -73,11 +73,16 @@ class LocalizationResult:
     angle: float  # Estimated angle to the sound source in degrees
 
 
+Int = np.int16
+Float = np.float16
+Complex = np.complex64
+
+
 class SoundLocalizer:
     def __init__(self, config: LocalizationConfig, visualizer: Visualizer):
         # TODO: Make sure that mic position ordering matches the ordering of the microphone streams/device indices
         self.mic_positions = np.array(
-            config.mic_positions, dtype=np.float32
+            config.mic_positions, dtype=Float
         )  # Get mic positions from config
         if self.mic_positions.shape[0] == 0:
             raise NoMicrophonePositionsError()
@@ -113,8 +118,11 @@ class SoundLocalizer:
         self.phase_shifts = self._compute_all_phase_shifts(self.freqs)
 
         # Initialize buffer for streaming
-        self.buffer: Optional[np.ndarray[np.float32]] = None
+        self.buffer: Optional[np.ndarray[Int]] = None
         self.total_results = []
+
+        # Initialize long-term cross-spectrum
+        self.long_term_cross_spectrum: Optional[np.ndarray[Complex]] = None
 
     def localize_stream(
         self,
@@ -146,7 +154,7 @@ class SoundLocalizer:
 
         # Convert buffers into numpy arrays
         multi_channel_data = [
-            np.frombuffer(data, dtype=np.float32) for data in multi_channel_stream
+            np.frombuffer(data, dtype=Int) for data in multi_channel_stream
         ]
 
         # Stack the multi-channel data into a 2D array (num_mics x num_samples) and replace any na values with zeroes
@@ -164,7 +172,7 @@ class SoundLocalizer:
                 self.buffer = self.buffer[:, -self.fft_size :]
 
         # Compute the cross-power spectrum of the buffered signals
-        cross_spectrum = self._compute_cross_spectrum(
+        short_term_cross_spectrum = self._compute_cross_spectrum(
             self.buffer, fft_size=self.fft_size
         )
 
@@ -173,12 +181,24 @@ class SoundLocalizer:
 
         # Iteratively localize each source
         for _ in range(num_sources):
-            best_direction, estimated_distance, source_idx = (
-                self._search_best_direction(cross_spectrum)
+
+            if self.long_term_cross_spectrum is None:
+                continue
+
+            best_direction_result = self._search_best_direction(
+                short_term_cross_spectrum, self.long_term_cross_spectrum
             )
-            if best_direction is not None:
+            if best_direction_result is not None:
+                best_direction, estimated_distance, best_direction_idx = (
+                    best_direction_result
+                )
+                print(
+                    f"Best direction: {best_direction}, estimated distance: {estimated_distance}, best direction index: {best_direction_idx}"
+                )
                 # Convert direction into an angle for the result
-                estimated_angle = self._calculate_estimated_angle(best_direction=best_direction)
+                estimated_angle = self._calculate_estimated_angle(
+                    best_direction=best_direction
+                )
 
                 # Append the localization result for the source
                 results.append(
@@ -187,56 +207,42 @@ class SoundLocalizer:
                     )
                 )
 
-                # Remove the contribution of the localized source to find the next source
-                cross_spectrum = self._remove_source_contribution(
-                    cross_spectrum, source_idx
+                # Remove the conwtribution of the localized source to find the next source
+                short_term_cross_spectrum = self._remove_source_contribution(
+                    short_term_cross_spectrum, best_direction_idx
                 )
 
-        self.total_results.extend(results)
+                if self.visualize:
+                    logger.info(
+                        f"Visualizing localization results for source {_} with angle {estimated_angle} and distance {estimated_distance}"
+                    )
+                    self.visualizer.plot(
+                        angle=estimated_angle,
+                        distance=estimated_distance,
+                        selected_grid_point=best_direction,
+                        average_point=[0, 0],
+                    )
 
-        if len(self.total_results) > 5:
-            average_distance = np.mean(
-                [result.distance for result in self.total_results]
-            )
-            average_angle = np.mean([result.angle for result in self.total_results])
-            self.total_results.pop(0)
+        # self.total_results.extend(results)
+        self.long_term_cross_spectrum = short_term_cross_spectrum
 
-        if self.visualize:
-            logger.info(
-                f"Visualizing localization results for source {_} with angle {estimated_angle} and distance {estimated_distance}"
-            )
-
-            average_point = self.compute_cartesian_coordinates(
-                average_distance, average_angle
-            )
-
-            self.visualizer.plot(
-                angle=estimated_angle,
-                distance=estimated_distance,
-                selected_grid_point=self.grid_points[source_idx],
-                average_point=average_point,
-            )
+        # if len(self.total_results) > 5:
+        #     average_distance = np.mean(
+        #         [result.distance for result in self.total_results]
+        #     )
+        #     average_angle = np.mean([result.angle for result in self.total_results])
+        #     self.total_results.pop(0)
 
         logger.debug(f"Localization results for current chunk: {results}")
         yield results
 
     def _compute_cross_spectrum(
-        self, mic_signals: np.ndarray[np.float32], fft_size: int = 1024, gamma: float = 0.1
-    ) -> np.ndarray[np.complex128]:
-        """
-        Compute the cross-power spectrum between microphone pairs with noise weighting.
-        
-        Args:
-            mic_signals (np.ndarray): Microphone signals with shape (num_mics, num_samples).
-            fft_size (int): Size of the FFT.
-            gamma (float): Exponent for the noise weighting. Typically 0 < gamma < 1.
-        
-        Returns:
-            np.ndarray: Cross-power spectrum with noise masking applied.
-        """
+        self, mic_signals: np.ndarray[Int], fft_size: int = 1024
+    ) -> np.ndarray[Complex]:
+        """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
 
-        mic_signals = mic_signals.astype(np.float64)
+        # mic_signals = mic_signals.astype(np.int16)
 
         # Compute the fast fourier transform (FFT) of each microphone signal
         mic_fft = np.fft.rfft(mic_signals, fft_size)
@@ -264,16 +270,16 @@ class SoundLocalizer:
     def _generate_circular_grid(
         self,
         offset: float = 0.45,
-        radius: float = 1.0,
+        radius: float = 6.0,
         num_points_radial: int = 50,
         num_points_angular: int = 360,
-    ) -> np.ndarray[np.float32]:
+    ) -> np.ndarray[Float]:
         """Generate a grid of points on a circular plane, optimized for speed."""
         # Create radial distances from 0 to the specified radius
-        r = np.linspace(offset, radius + offset, num_points_radial, dtype=np.float32)
+        r = np.linspace(offset, radius + offset, num_points_radial, dtype=Float)
 
         # Create angular values from 0 to 2*pi
-        theta = np.linspace(0, 2 * np.pi, num_points_angular, dtype=np.float32)
+        theta = np.linspace(0, 2 * np.pi, num_points_angular, dtype=Float)
 
         # Compute x and y directly using broadcasting without creating a meshgrid
         r = r[:, np.newaxis]  # Convert r to column vector for broadcasting
@@ -282,7 +288,7 @@ class SoundLocalizer:
 
         # Return the points stacked as (x, y) pairs
         return np.column_stack((x.ravel(), y.ravel()))
-    
+
     # TODO: Type hinting could be improved
     def _calculate_estimated_angle(self, best_direction: Tuple[float, float]) -> float:
         """
@@ -305,21 +311,40 @@ class SoundLocalizer:
         return np.degrees(np.arctan2(delta_y, delta_x))
 
     def _search_best_direction(
-        self, cross_spectrum: np.ndarray[np.complex128]
-    ) -> Tuple[np.ndarray, np.float32, int]:
+        self,
+        short_cross_spectrum: np.ndarray[Complex],
+        long_cross_spectrum: np.ndarray[Complex],
+        threshold: float = 0.1,
+    ) -> Optional[Tuple[np.ndarray, Float, int]]:
         """Search the circular grid for the direction with maximum beamformer output."""
-        energies = self._compute_beamformer_energies(cross_spectrum)
-        best_direction_idx = np.argmax(energies)
+        short_term_energies = self._compute_beamformer_energies(short_cross_spectrum)
+        long_term_energies = self._compute_beamformer_energies(long_cross_spectrum)
+
+        posterior_probabilities = self._compute_posterior_probabilities(
+            short_term_energies, long_term_energies
+        )
+        # best_direction_idx = np.argmax(short_term_energies)
+        best_direction_idx = np.argmax(posterior_probabilities)
         best_direction = self.grid_points[best_direction_idx]
         estimated_distance = np.min(self.distances_to_mics[best_direction_idx])
-        print(
-            f"Position of closest mic: {self.mic_positions[np.argmin(self.distances_to_mics[best_direction_idx])]}"
+
+        logger.info(f"Posterior probabilities max: {np.max(posterior_probabilities)}")
+
+        logger.info(
+            f"Posterior probabilities index: {np.argmax(posterior_probabilities)}"
         )
+        # logger.info(f"Best direction index: {best_direction_idx}")
+
+        # if posterior_probabilities[best_direction_idx] > threshold:
+        #     return best_direction, estimated_distance, best_direction_idx
+        # else:
+        #     return None
+
         return best_direction, estimated_distance, best_direction_idx
 
     def _compute_all_phase_shifts(
-        self, freqs: np.ndarray[np.float32]
-    ) -> np.ndarray[np.complex128]:
+        self, freqs: np.ndarray[Float]
+    ) -> np.ndarray[Complex]:
         """
         Precompute phase shifts for all grid points, microphone pairs, and frequency bins.
         """
@@ -359,8 +384,8 @@ class SoundLocalizer:
         return distances_to_mics, delays
 
     def _compute_beamformer_energies(
-        self, cross_spectrum: np.ndarray[np.complex128]
-    ) -> np.ndarray:
+        self, cross_spectrum: np.ndarray[Complex]
+    ) -> np.ndarray[Float]:
         """Compute the beamformer energy given the cross-spectrum and delays."""
         cross_spectrum_expanded = cross_spectrum[np.newaxis, :, :, :]
         # Multiply and sum over mics and frequency bins
@@ -371,8 +396,8 @@ class SoundLocalizer:
         return energies
 
     def _remove_source_contribution(
-        self, cross_spectrum: np.ndarray[np.complex128], source_idx: int
-    ) -> np.ndarray[np.complex128]:
+        self, cross_spectrum: np.ndarray[Complex], source_idx: int
+    ) -> np.ndarray[Complex]:
         """
         Remove the contribution of a localized source using vectorized operations.
         """
@@ -384,6 +409,40 @@ class SoundLocalizer:
         # Subtract the contribution from the cross-spectrum
         cross_spectrum -= phase_shift
         return cross_spectrum
+
+    def _compute_posterior_probabilities(
+        self,
+        short_term_energy: np.ndarray[Float],
+        medium_term_energy: np.ndarray[Float],
+        beta: float = 0.7,
+        p1: float = 0.5,
+    ) -> np.ndarray[Float]:
+        # Normalize the short-term and medium-term energies
+        # Need to normalize the energies in order to compute probabilities
+        normalized_short_term_energy = short_term_energy / np.max(short_term_energy)
+        normalized_medium_term_energy = medium_term_energy / np.max(medium_term_energy)
+
+        # Calculate the probability that the short term energy source is not present
+        not_present_prob_short_term_energy = 1 - normalized_short_term_energy
+
+        # Calculate the probability that the medium term energy source is not present
+        not_present_prob_medium_term_energy = 1 - normalized_medium_term_energy
+
+        # Calculate the probability that the source is present
+        probability_source_present = (
+            normalized_short_term_energy * normalized_medium_term_energy
+        ) ** (1 - beta / 2) / (p1 ** (1 - beta))
+
+        # Calculate the probability that the source is not present
+        probability_source_not_present = (
+            not_present_prob_short_term_energy * not_present_prob_medium_term_energy
+        ) ** (1 - beta / 2) / (p1 ** (1 - beta))
+
+        # Calculate the posterior probabilities
+        posterior_probabilities = 1 / (
+            1 + probability_source_present / probability_source_not_present
+        )
+        return posterior_probabilities
 
     def compute_cartesian_coordinates(self, distance, angle):
         """
