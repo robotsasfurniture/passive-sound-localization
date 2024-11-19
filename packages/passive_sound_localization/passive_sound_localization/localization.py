@@ -124,6 +124,10 @@ class SoundLocalizer:
         # Initialize long-term cross-spectrum
         self.long_term_cross_spectrum: Optional[np.ndarray[Complex]] = None
 
+        # Add buffer for PSD history
+        self.psd_history = []
+        self.history_length = 10  # Number of frames to average over
+
     def localize_stream(
         self,
         multi_channel_stream: List[bytes],
@@ -248,17 +252,33 @@ class SoundLocalizer:
         mic_fft = np.fft.rfft(mic_signals, fft_size)
 
         # Compute the power spectral density (PSD)
-        mic_psd = np.abs(mic_fft) ** 2
+        #mic_psd = np.abs(mic_fft) ** 2
+        current_psd = np.abs(mic_fft) ** 2
 
         # Compute the noise estimate as the time average of the PSD
         # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate 
-        noise_estimate = np.mean(mic_psd, axis=1, keepdims=True)
+        # noise_estimate = np.mean(mic_psd, axis=1, keepdims=True)
+
+        # Update PSD history
+        # TODO: Could use circular buffer with numpy to make it more efficient
+        self.psd_history.append(current_psd)
+        if len(self.psd_history) > self.history_length:
+            self.psd_history.pop(0)
+
+        # Compute mean PSD over history
+        mean_psd = np.mean(self.psd_history, axis=0)
 
         # Compute the noise masking weight
+        # weight = np.where(
+        #     mic_psd <= noise_estimate,
+        #     1,
+        #     (mic_psd / noise_estimate) ** gamma
+        # )
+
         weight = np.where(
-            mic_psd <= noise_estimate,
+            mean_psd > 0,
             1,
-            (mic_psd / noise_estimate) ** gamma
+            (current_psd / (mean_psd + 1e-10)) ** gamma
         )
 
         # Compute the cross-power spectrum for each microphone pair using broadcasting
@@ -289,7 +309,6 @@ class SoundLocalizer:
         # Return the points stacked as (x, y) pairs
         return np.column_stack((x.ravel(), y.ravel()))
 
-    # TODO: Type hinting could be improved
     def _calculate_estimated_angle(self, best_direction: Tuple[float, float]) -> float:
         """
         Calculate the estimated angle based on the best direction and the front microphone.
@@ -304,11 +323,6 @@ class SoundLocalizer:
         delta_x = best_direction[0]
         delta_y = best_direction[1] - self.mic_positions[0, 1]
         return np.degrees(np.atan2(delta_y, delta_x))
-
-    def _calculate_estimated_angle(self, best_direction: Tuple[float, float]) -> float:
-        delta_x = best_direction[0]
-        delta_y = best_direction[1] - self.mic_positions[0, 1]
-        return np.degrees(np.arctan2(delta_y, delta_x))
 
     def _search_best_direction(
         self,
