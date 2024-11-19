@@ -289,14 +289,14 @@ class SoundLocalizer:
 
     def _generate_circular_grid(
         self,
-        offset: float = 0.45,
+        robot_radius_offset: float = 0.45,
         radius: float = 6.0,
         num_points_radial: int = 50,
         num_points_angular: int = 360,
     ) -> np.ndarray[Float]:
         """Generate a grid of points on a circular plane, optimized for speed."""
         # Create radial distances from 0 to the specified radius
-        r = np.linspace(offset, radius + offset, num_points_radial, dtype=Float)
+        r = np.linspace(robot_radius_offset, radius + robot_radius_offset, num_points_radial, dtype=Float)
 
         # Create angular values from 0 to 2*pi
         theta = np.linspace(0, 2 * np.pi, num_points_angular, dtype=Float)
