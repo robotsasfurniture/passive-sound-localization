@@ -93,6 +93,16 @@ poetry run pytest
 ```
 
 # Debugging Issues on Lab Laptop
+## Building Old Code Instead of Updated Code
+If you notice that your changes aren't being reflected when running the project, it's likely because the build system is using cached files from a previous build. To force a clean build of the updated code:
+
+1. Remove the install folder for the package:
+```bash
+rm -rf install/passive_sound_localization
+```
+2. Re-build the project following the [Building Project on Lab Laptop](#building-project-on-lab-laptop) section
+3. Re-run the project following the [Running Project on Lab Laptop](#running-project-on-lab-laptop) section
+
 ## Microphone Device Indexing
 This project identifies microphones by their device index to configure the audio input for sound localization accurately. During runtime, if an "Invalid number of channels" error appears, it's likely due to device indices shifting, which can happen when audio settings change. To prevent index shifting, ensure that in **Settings > Sound > Output**, the Output Device is set to "Speakers - Built-in Audio", and in **Settings > Sound > Input**, the Input Device is "Internal Microphone - Built-in Audio".
 
