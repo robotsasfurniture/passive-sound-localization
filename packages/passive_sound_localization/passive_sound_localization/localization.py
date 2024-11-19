@@ -328,7 +328,6 @@ class SoundLocalizer:
         self,
         short_cross_spectrum: np.ndarray[Complex],
         long_cross_spectrum: np.ndarray[Complex],
-        threshold: float = 0.1,
     ) -> Optional[Tuple[np.ndarray, Float, int]]:
         """Search the circular grid for the direction with maximum beamformer output."""
         short_term_energies = self._compute_beamformer_energies(short_cross_spectrum)
@@ -347,12 +346,6 @@ class SoundLocalizer:
         logger.info(
             f"Posterior probabilities index: {np.argmax(posterior_probabilities)}"
         )
-        # logger.info(f"Best direction index: {best_direction_idx}")
-
-        # if posterior_probabilities[best_direction_idx] > threshold:
-        #     return best_direction, estimated_distance, best_direction_idx
-        # else:
-        #     return None
 
         return best_direction, estimated_distance, best_direction_idx
 
