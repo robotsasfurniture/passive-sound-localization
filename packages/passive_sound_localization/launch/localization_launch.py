@@ -20,6 +20,12 @@ def generate_launch_description():
                 parameters=[
                     config,
                 ],
+            ),
+            Node(
+                package="movement_library",
+                executable="movement_node",
+                name="movement_node",
+                output="screen",
             )
         ]
     )
