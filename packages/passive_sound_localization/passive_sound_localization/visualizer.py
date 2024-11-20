@@ -126,6 +126,75 @@ class Visualizer:
         plt.pause(0.1)
 
 
+class AudioVisualizer:
+    def __init__(self, sampling_rate):
+        """
+        Initialize the MicrophonePlotter class.
+
+        Args:
+            sampling_rate (int): Sampling rate in Hz (e.g., 44100).
+        """
+        self.sampling_rate = sampling_rate
+        self.fig, self.axs = None, None  # For managing the plot
+        self.microphone_data = []  # Store microphone data lists
+
+    def plot(self, mic_data_list):
+        """
+        Plot the microphone data.
+
+        Args:
+            mic_data_list (list of np.ndarray): List of int16 arrays for microphone data.
+        """
+        # Check if new microphones need to be added
+        num_mics = len(mic_data_list)
+        if len(self.microphone_data) < num_mics:
+            self.microphone_data.extend(
+                [[] for _ in range(num_mics - len(self.microphone_data))]
+            )
+
+        # Append new data to existing data
+        for i, data in enumerate(mic_data_list):
+            self.microphone_data[i] = np.concatenate((self.microphone_data[i], data))[
+                -2000:
+            ]
+
+        # Create or update the plot
+        if self.fig is None or self.axs is None or len(self.axs) != num_mics:
+            self.fig, self.axs = plt.subplots(
+                num_mics, 1, figsize=(10, 3 * num_mics), sharex=True
+            )
+            if num_mics == 1:
+                self.axs = [self.axs]
+
+        time = [
+            np.linspace(
+                0,
+                len(self.microphone_data[i]) / self.sampling_rate,
+                len(self.microphone_data[i]),
+            )
+            for i in range(num_mics)
+        ]
+
+        for i, ax in enumerate(self.axs):
+            ax.clear()
+            ax.plot(time[i], self.microphone_data[i], label=f"Microphone {i + 1}")
+            ax.set_title(f"Microphone {i + 1}")
+            ax.set_ylabel("Amplitude")
+            ax.set_ylim(-2000, 2000)
+            ax.legend(loc="upper right")
+
+        self.axs[-1].set_xlabel("Time (s)")
+
+        plt.pause(0.1)  # Allow the plot to update dynamically
+
+    def clear(self):
+        """Clear all stored data and reset the plot."""
+        self.microphone_data = []
+        if self.fig:
+            plt.close(self.fig)
+            self.fig, self.axs = None, None
+
+
 # Example usage
 if __name__ == "__main__":
     mic_positions = [(1, 2), (3, 4), (5, 6)]
