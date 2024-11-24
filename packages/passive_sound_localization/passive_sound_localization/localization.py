@@ -128,6 +128,19 @@ class SoundLocalizer:
         self.psd_history = []
         self.history_length = 10  # Number of frames to average over
 
+        # Refine speech frequency bands
+        self.equalizer = np.ones_like(self.freqs)
+
+        # Strong emphasis on primary speech frequencies
+        primary_speech = (self.freqs >= 200) & (self.freqs <= 500)
+        secondary_speech = (self.freqs > 500) & (self.freqs <= 1000)
+        background = ~(primary_speech | secondary_speech)
+        # speech_mask = (self.freqs >= 300) & (self.freqs <= 3000)
+        # self.equalizer[~speech_mask] = 0.1 # Attenuate non-speech frequencies
+        self.equalizer[primary_speech] = 1.0
+        self.equalizer[secondary_speech] = 0.5
+        self.equalizer[background] = 0.1
+
     def localize_stream(
         self,
         multi_channel_stream: List[bytes],
@@ -175,9 +188,16 @@ class SoundLocalizer:
             if self.buffer.shape[1] > self.fft_size:
                 self.buffer = self.buffer[:, -self.fft_size :]
 
+        # Apply equalizer to buffered data in frequency domain
+        buffer_fft = np.fft.rfft(self.buffer, self.fft_size)
+        filtered_buffer = buffer_fft * self.equalizer[np.newaxis, :]
+
         # Compute the cross-power spectrum of the buffered signals
+        # short_term_cross_spectrum = self._compute_cross_spectrum(
+        #     self.buffer, fft_size=self.fft_size
+        # )
         short_term_cross_spectrum = self._compute_cross_spectrum(
-            self.buffer, fft_size=self.fft_size
+            filtered_buffer, fft_size=self.fft_size
         )
 
         # List to hold localization results for each source
@@ -199,6 +219,20 @@ class SoundLocalizer:
                 print(
                     f"Best direction: {best_direction}, estimated distance: {estimated_distance}, best direction index: {best_direction_idx}"
                 )
+
+                # Check temporal consistency
+                # if len(self.direction_history) > 0:
+                #     prev_direction = self.direction_history[-1]
+                #     direction_change = np.linalg.norm(best_direction - prev_direction)
+                #     if direction_change > 2.0:  # Threshold for sudden direction changes
+                #         continue  # Skip this result if direction changed too suddenly
+                
+                # self.direction_history.append(best_direction)
+                # if len(self.direction_history) > 5:  # Keep last 5 directions
+                #     self.direction_history.pop(0)
+
+
+
                 # Convert direction into an angle for the result
                 estimated_angle = self._calculate_estimated_angle(
                     best_direction=best_direction
@@ -241,19 +275,24 @@ class SoundLocalizer:
         yield results
 
     def _compute_cross_spectrum(
-        self, mic_signals: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
+        # self, mic_signals: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
+        self, mic_fft: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
     ) -> np.ndarray[Complex]:
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
+         # Ensure mic_fft has correct shape (num_mics, num_freqs)
+        if mic_fft.shape[-1] != len(self.freqs):
+            raise ValueError(f"FFT shape mismatch. Expected {len(self.freqs)} frequency bins, got {mic_fft.shape[-1]}")
 
         # mic_signals = mic_signals.astype(np.int16)
 
         # Compute the fast fourier transform (FFT) of each microphone signal
-        mic_fft = np.fft.rfft(mic_signals, fft_size)
+        # mic_fft = np.fft.rfft(mic_signals, fft_size)
 
         # Compute the power spectral density (PSD)
         #mic_psd = np.abs(mic_fft) ** 2
         current_psd = np.abs(mic_fft) ** 2
+        # current_psd = np.mean(np.abs(mic_fft) ** 2, axis=1, keepdims=True)
 
         # Compute the noise estimate as the time average of the PSD
         # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate 
@@ -276,7 +315,7 @@ class SoundLocalizer:
         # )
 
         weight = np.where(
-            mean_psd > 0,
+            current_psd <= mean_psd,
             1,
             (current_psd / (mean_psd + 1e-10)) ** gamma
         )
@@ -328,6 +367,7 @@ class SoundLocalizer:
         self,
         short_cross_spectrum: np.ndarray[Complex],
         long_cross_spectrum: np.ndarray[Complex],
+        probability_threshold: float = 0.3
     ) -> Optional[Tuple[np.ndarray, Float, int]]:
         """Search the circular grid for the direction with maximum beamformer output."""
         short_term_energies = self._compute_beamformer_energies(short_cross_spectrum)
@@ -336,12 +376,20 @@ class SoundLocalizer:
         posterior_probabilities = self._compute_posterior_probabilities(
             short_term_energies, long_term_energies
         )
+
+        # Only select direction if probability is high enough
+        max_prob = np.max(posterior_probabilities)
+        logger.info(f"Max probability: {max_prob}")
+        logger.info(f"Mean probability: {np.mean(posterior_probabilities)}")
+        # if max_prob < probability_threshold:
+        #     return None # No confident direction found
+
         # best_direction_idx = np.argmax(short_term_energies)
         best_direction_idx = np.argmax(posterior_probabilities)
         best_direction = self.grid_points[best_direction_idx]
         estimated_distance = np.min(self.distances_to_mics[best_direction_idx])
 
-        logger.info(f"Posterior probabilities max: {np.max(posterior_probabilities)}")
+        # logger.info(f"Posterior probabilities max: {np.max(posterior_probabilities)}")
 
         logger.info(
             f"Posterior probabilities index: {np.argmax(posterior_probabilities)}"
@@ -391,7 +439,7 @@ class SoundLocalizer:
         return distances_to_mics, delays
 
     def _compute_beamformer_energies(
-        self, cross_spectrum: np.ndarray[Complex]
+        self, cross_spectrum: np.ndarray[Complex], energy_threshold: float = 0.3
     ) -> np.ndarray[Float]:
         """Compute the beamformer energy given the cross-spectrum and delays."""
         cross_spectrum_expanded = cross_spectrum[np.newaxis, :, :, :]
@@ -400,6 +448,14 @@ class SoundLocalizer:
             cross_spectrum_expanded * self.phase_shifts
         )  # Shape: (num_grid_points, num_mics, num_mics, num_freq_bins)
         energies = np.abs(np.sum(product, axis=(1, 2, 3)))  # Shape: (num_grid_points,)
+
+        # Apply threshold relative to maximum energy
+        # max_energy = np.max(energies)
+        # mean_energy = np.mean(energies)
+        # logger.info(f"Max energy: {max_energy}")
+        # logger.info(f"Mean energy: {mean_energy}")
+        # energies[energies < max_energy * energy_threshold] = 0
+
         return energies
 
     def _remove_source_contribution(
@@ -423,11 +479,25 @@ class SoundLocalizer:
         medium_term_energy: np.ndarray[Float],
         beta: float = 0.7,
         p1: float = 0.5,
+        energy_threshold: float = 0.5
     ) -> np.ndarray[Float]:
+        # Use reference energy
+        # reference_energy = 1e6  # Choose based on your typical energy values
+
+        # normalized_short_term_energy = short_term_energy / np.max(reference_energy)
+        # normalized_medium_term_energy = medium_term_energy / np.max(reference_energy)
+
         # Normalize the short-term and medium-term energies
         # Need to normalize the energies in order to compute probabilities
         normalized_short_term_energy = short_term_energy / np.max(short_term_energy)
         normalized_medium_term_energy = medium_term_energy / np.max(medium_term_energy)
+
+        # Apply energy threshold to filter out very low energy sources
+        normalized_short_term_energy[normalized_short_term_energy < energy_threshold] = 0
+        normalized_medium_term_energy[normalized_medium_term_energy < energy_threshold] = 0
+
+        logger.info(f"Max energy: {np.max(normalized_short_term_energy)}")
+        logger.info(f"Mean energy: {np.mean(normalized_short_term_energy)}")
 
         # Calculate the probability that the short term energy source is not present
         not_present_prob_short_term_energy = 1 - normalized_short_term_energy
@@ -440,14 +510,18 @@ class SoundLocalizer:
             normalized_short_term_energy * normalized_medium_term_energy
         ) ** (1 - beta / 2) / (p1 ** (1 - beta))
 
+        logger.info(f"Max Prob source is present: {np.max(probability_source_present)}")
+
         # Calculate the probability that the source is not present
         probability_source_not_present = (
             not_present_prob_short_term_energy * not_present_prob_medium_term_energy
         ) ** (1 - beta / 2) / (p1 ** (1 - beta))
 
+        logger.info(f"Max Prob source not present: {np.max(probability_source_not_present)}")
+
         # Calculate the posterior probabilities
         posterior_probabilities = 1 / (
-            1 + probability_source_present / probability_source_not_present
+            1 + probability_source_present / (probability_source_not_present + 1e-10)
         )
         return posterior_probabilities
 
