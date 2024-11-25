@@ -38,7 +38,8 @@ while True:
                 )
 
                 for localization_results in localization_stream:
-                    logger.info(f"Localization results: {localization_results}")
+                    if len(localization_results) > 0:
+                        logger.info(f"Localization results: {localization_results}")
 
             except Exception as e:
                 print(f"Realtime Localization error: {e}")
