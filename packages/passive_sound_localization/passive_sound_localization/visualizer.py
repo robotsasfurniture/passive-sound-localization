@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from matplotlib.animation import FuncAnimation
 
 import numpy as np
@@ -9,7 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class Visualizer:
-    def __init__(self, microphone_positions: List[Tuple[float, float]]):
+    def __init__(
+        self,
+        microphone_positions: List[Tuple[float, float]],
+        title: Optional[str] = None,
+    ):
         """
         Initialize the visualizer with microphone positions and target position.
 
@@ -22,6 +26,7 @@ class Visualizer:
 
         self.continue_execution = True
         self.grid_points = []
+        self.title = title
 
     def plot(
         self,
@@ -33,7 +38,6 @@ class Visualizer:
         """
         Plot the positions of the microphones and the target in real-time.
         """
-
         self.ax.clear()  # Clear previous plots
 
         # Plot grid points if available
@@ -87,12 +91,19 @@ class Visualizer:
         # Add labels, title, and legend
         self.ax.set_xlabel("X Coordinate")
         self.ax.set_ylabel("Y Coordinate")
-        self.ax.set_title(f"Angle: {angle:.2f}, Distance: {distance:.2f}")
+
+        title = f"Angle: {angle:.2f}, Distance: {distance:.2f}"
+        if self.title:
+            title = f"{self.title} - {title}"
+        self.ax.set_title(title)
+
         self.ax.legend()
 
         # Update the plot
         plt.draw()
-        plt.pause(0.1)  # Pause briefly to refresh the plot
+
+        # Continue in real-time
+        plt.pause(0.1)
 
     def set_grid_points(self, grid_points: List[Tuple[float, float]]):
         """
