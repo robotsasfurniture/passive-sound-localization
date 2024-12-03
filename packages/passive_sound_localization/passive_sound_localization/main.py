@@ -1,27 +1,27 @@
-from typing import Generator
+from typing import Callable
 from passive_sound_localization.logger import setup_logger
 from passive_sound_localization.models.configs import Config
 
 from passive_sound_localization.localization import SoundLocalizer
 from passive_sound_localization.realtime_audio_streamer import RealtimeAudioStreamer
-from passive_sound_localization.realtime_openai_websocket import OpenAIWebsocketClient
+from passive_sound_localization.realtime_openai_websocket import (
+    OpenAIResponseType,
+    OpenAIWebsocketClient,
+)
 from passive_sound_localization.visualizer import Visualizer
 from passive_sound_localization_msgs.msg import LocalizationResult
 
 from concurrent.futures import ThreadPoolExecutor
+from collections import deque
 from rclpy.node import Node
 import logging
 import rclpy
-import time
-
-from queue import Queue
-
-commands = Queue(maxsize=10)
-locations = Queue(maxsize=10)
 
 
 def send_audio_continuously(
-    client, streamer: RealtimeAudioStreamer, logger: logging.Logger
+    client: OpenAIWebsocketClient,
+    streamer: RealtimeAudioStreamer,
+    logger: logging.Logger,
 ):
     logger.info("Sending audio to OpenAI")
     for audio_streams in streamer.audio_generator():
@@ -29,77 +29,51 @@ def send_audio_continuously(
             continue
 
         client.send_audio(streamer.resample_stream(audio_streams[0]))
-        time.sleep(0.01)
+        client.store_audio(audio_streams)
 
 
-def receive_text_messages(client, logger: logging.Logger):
-    logger.info("OpanAI: Listening to audio stream")
-    while True:
-        try:
-            command = client.receive_text_response()
-            logger.info(f"Received command: {command}")
-            if command and command.strip() == "MOVE_TO":
-                logger.info(f"Received command: {command}")
-
-                if commands.full():
-                    commands.get()
-                    commands.task_done()
-                commands.put(command)
-        except Exception as e:
-            logger.error(f"Error receiving response: {e}")
-
-
-def realtime_localization(
-    streamer: RealtimeAudioStreamer, localizer: SoundLocalizer, logger: logging.Logger
+def receive_text_messages(
+    client: OpenAIWebsocketClient,
+    localizer: SoundLocalizer,
+    publisher: Callable,
+    logger: logging.Logger,
 ):
-    logger.info("Localization: Listening to audio stream")
-    did_get = False
-    for audio_streams in streamer.audio_generator():
-        try:
-            if audio_streams is None:
-                logger.error("Audio streams are None")
-                continue
-
-            #  Stream audio data and pass it to the localizer
-            localization_stream = localizer.localize_stream(
-                audio_streams,
-            )
-
-            for localization_results in localization_stream:
-                if locations.full():
-                    locations.get()
-                    did_get = True
-
-                logger.debug(f"Putting localization results: {localization_results}")
-                locations.put(localization_results)
-
-            if did_get:
-                locations.task_done()
-            did_get = False
-
-        except Exception as e:
-            print(f"Realtime Localization error: {e}")
-
-
-def command_executor(publisher, logger: logging.Logger):
-    logger.info("Executor: listening for command")
+    logger.info("OpanAI: Listening to audio stream")
+    locations = deque(maxlen=10)
     while True:
         try:
-            if commands.qsize() > 0:
-                logger.info(
-                    f"Got command, and current location size is: {locations.qsize()}"
-                )
+            response = client.receive_response()
 
-                commands.get()
-                commands.task_done()
-                if locations.qsize() > 0:
-                    location = locations.get()
-                    logger.info(f"Publishing location: {location}")
-                    publisher(location[0])
+            match response["type"]:
+                case OpenAIResponseType.NONE:
+                    continue
 
-                locations.task_done()
+                case OpenAIResponseType.TEXT:
+                    logger.info(f"Received text response: {response['text']}")
+                    if response["text"].strip() == "MOVE_TO":
+                        logger.info("Received command: MOVE_TO")
+
+                        if len(locations) > 0:
+                            location = locations.pop()
+                            logger.info(f"Publishing location: {location}")
+                            publisher(location)
+                        else:
+                            logger.error("No locations to publish")
+
+                case OpenAIResponseType.AUDIO:
+                    logger.info(
+                        f"Received audio chunks: {len(response['audio_chunks'])}"
+                    )
+
+                    for audio_chunks in response["audio_chunks"]:
+                        localization_results = localizer.localize(audio_chunks)
+                        locations.extend(localization_results)
+
+                case _:
+                    logger.error(f"Received unknown response type: {response['type']}")
+
         except Exception as e:
-            print(f"Command executor error: {e}")
+            logger.error(f"Error receiving response: {str(e)}")
 
 
 class LocalizationNode(Node):
@@ -153,18 +127,15 @@ class LocalizationNode(Node):
         self.logger.info("Processing audio...")
 
         with self.streamer as streamer, self.openai_ws_client as client:
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 self.logger.info("Threading log")
                 executor.submit(send_audio_continuously, client, streamer, self.logger)
-                executor.submit(receive_text_messages, client, self.logger)
                 executor.submit(
-                    realtime_localization,
-                    streamer,
+                    receive_text_messages,
+                    client,
                     self.localizer,
+                    lambda x: self.publish_results(x),
                     self.logger,
-                )
-                executor.submit(
-                    command_executor, lambda x: self.publish_results(x), self.logger
                 )
 
     def publish_results(self, localization_results):
