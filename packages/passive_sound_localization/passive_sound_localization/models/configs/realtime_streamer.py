@@ -6,7 +6,7 @@ from typing import List
 class RealtimeAudioStreamerConfig:
     sample_rate: int = 44100
     channels: int = 1
-    chunk: int = 1024
+    chunk: int = 882
     # device_indices: List[int] = field(default_factory=lambda: [2, 3, 4, 5]) # Lab configuration
     # device_indices: List[int] = field(
     #     default_factory=lambda: [1, 2, 3, 4]

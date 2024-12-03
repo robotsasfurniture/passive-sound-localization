@@ -3,15 +3,18 @@ from websockets.sync.client import connect
 import json
 import base64
 import logging
-from typing import Optional
+from typing import List, Optional, TypedDict
+from enum import Enum
 
-from passive_sound_localization.models.configs.openai_websocket import (
-    OpenAIWebsocketConfig,
-)
-
-# from models.configs.openai_websocket import (
+# from passive_sound_localization.models.configs.openai_websocket import (
 #     OpenAIWebsocketConfig,
-# )  # Only needed to run with `realtime_audio.py`
+# )
+# from passive_sound_localization.models.ring_buffer import AudioRingBuffer
+
+from models.configs.openai_websocket import (
+    OpenAIWebsocketConfig,
+)  # Only needed to run with `realtime_audio.py`
+from models.ring_buffer import AudioRingBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +53,23 @@ class OpenAITimeoutError(Exception):
         )
 
 
+class OpenAIResponseType(Enum):
+    TEXT = "TEXT"
+    AUDIO = "AUDIO"
+    NONE = "NONE"
+
+
+class OpenAIResponse(TypedDict):
+    type: OpenAIResponseType
+    text: str = ""
+    audio_chunks: List[List[bytes]] = []
+
+
 INSTRUCTIONS = """
     The instructor robot will receive audio input to determine movement actions based on command cues. For each command, the robot should perform a corresponding movement action as follows:
 
-- **Audio cues for 'Come here'** – MOVE_TO
-- **Audio cues for 'Over here'** – MOVE_TO
+- **Audio cues for 'Table Bot come here'** – MOVE_TO
+- **Audio cues for 'Table Bot over here'** – MOVE_TO
 
 
 The robot should only respond using these commands. The robot should analyze audio input continuously and prioritize the most recent command. If ambiguous commands are detected (e.g., unclear or overlapping), the robot should remain in its last known state until a clearer command is received.
@@ -69,11 +84,14 @@ class OpenAIWebsocketClient:
         self.session_id: Optional[str] = None
         self.instructions: str = INSTRUCTIONS
         self.ws: Optional[WebSocketClientProtocol] = None
+        self.audio_ring_buffer: AudioRingBuffer = AudioRingBuffer(max_chunks=10000)
+        self.current_ms: int = 0
+        self.started_ms: int = 0
 
     def __enter__(self):
         self._connect()
         self._configure_session()
-        print("Connected websocket...")
+        logger.info("Connected websocket...")
         return self
 
     def __exit__(self):
@@ -127,35 +145,52 @@ class OpenAIWebsocketClient:
             json.dumps({"type": "input_audio_buffer.append", "audio": audio_b64})
         )
 
-    def receive_text_response(self, timeout: Optional[float] = None) -> str:
-        try:
-            # Tries to receive the next message (in a blocking manner) from the OpenAI websocket
-            # If the message doesn't arrive in 300ms, then it raises a TimeoutError
-            message = json.loads(self.ws.recv(timeout=timeout))
-        except TimeoutError:
-            raise OpenAITimeoutError(timeout=timeout)
+    def store_audio(self, audio_chunks: List[bytes]) -> None:
+        # Calculate audio duration in milliseconds
+        self.audio_ring_buffer.add_chunk(self.current_ms, audio_chunks)
+        self.current_ms += 10
 
-        # Print message just to see what we're receiving
-        # print(message)
+    def receive_response(self) -> OpenAIResponse:
+        message = json.loads(self.ws.recv())
 
-        # Checks to see any general errors
-        if message["type"] == "error":
-            raise OpenAIWebsocketError(
-                error_code=message["error"]["code"],
-                error_message=message["error"]["message"],
-            )
+        # TODO(@john2360): Fix this. The error checking returns key errors.
+        # # Checks to see any general errors
+        # if message["type"] == "error":
+        #     logger.error(f"OpenAI websocket error: {message['error']}")
+        #     raise OpenAIWebsocketError(
+        #         error_code=message["error"]["code"],
+        #         error_message=message["error"]["message"],
+        #     )
 
-        # Checks to see whether OpenAI is specifically rate limiting our responses
-        if (
-            message["type"] == "response.done"
-            and message["response"]["status_details"]["error"]["code"]
-            == "rate_limit_exceeded"
-        ):
-            raise OpenAIRateLimitError()
+        # # Checks to see whether OpenAI is specifically rate limiting our responses
+        # if (
+        #     message["type"] == "response.done"
+        #     and message["response"]["status_details"]["error"]["code"]
+        #     == "rate_limit_exceeded"
+        # ):
+        #     logger.error("Hit OpenAI Realtime API rate limit")
+        #     raise OpenAIRateLimitError()
 
         # Checks to see if an actual text response was sent, and returns the text
         if message["type"] == "response.text.done":
-            return message["text"]
+            return OpenAIResponse(type=OpenAIResponseType.TEXT, text=message["text"])
+
+        # Speech started, so we need to get the audio chunks
+        if message["type"] == "input_audio_buffer.speech_started":
+            self.started_ms = self.current_ms
+
+        # Speech ended, so we need to reset the current time
+        if message["type"] == "input_audio_buffer.speech_stopped":
+            audio_chunks = self.audio_ring_buffer.get_chunks(
+                start_ms=self.started_ms, end_ms=self.current_ms
+            )
+
+            self.started_ms = 0
+            return OpenAIResponse(
+                type=OpenAIResponseType.AUDIO, audio_chunks=audio_chunks
+            )
+
+        return OpenAIResponse(type=OpenAIResponseType.NONE)
 
     def _close(self) -> None:
         if self.ws:

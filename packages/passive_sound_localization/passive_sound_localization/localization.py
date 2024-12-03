@@ -79,7 +79,7 @@ Complex = np.complex64
 
 
 class SoundLocalizer:
-    def __init__(self, config: LocalizationConfig, visualizer: Visualizer):
+    def __init__(self, config: LocalizationConfig, visualizer: Optional[Visualizer]):
         # TODO: Make sure that mic position ordering matches the ordering of the microphone streams/device indices
         self.mic_positions = np.array(
             config.mic_positions, dtype=Float
@@ -141,11 +141,11 @@ class SoundLocalizer:
         self.equalizer[secondary_speech] = 0.5
         self.equalizer[background] = 0.1
 
-    def localize_stream(
+    def localize(
         self,
         multi_channel_stream: List[bytes],
         num_sources: int = 1,
-    ) -> Iterator[List[LocalizationResult]]:
+    ) -> List[LocalizationResult]:
         """
         Performs real-time sound source localization on streaming multi-channel audio data.
 
@@ -153,7 +153,7 @@ class SoundLocalizer:
         - multi_channel_stream: An iterator that yields lists of numpy arrays containing audio data from each microphone.
         - num_sources: The number of sound sources to localize (default is 1 for single-source localization).
 
-        Yields:
+        Returns:
         - List of LocalizationResult objects for each processed audio chunk.
         """
         num_mic_streams = len(multi_channel_stream)
@@ -226,12 +226,10 @@ class SoundLocalizer:
                 #     direction_change = np.linalg.norm(best_direction - prev_direction)
                 #     if direction_change > 2.0:  # Threshold for sudden direction changes
                 #         continue  # Skip this result if direction changed too suddenly
-                
+
                 # self.direction_history.append(best_direction)
                 # if len(self.direction_history) > 5:  # Keep last 5 directions
                 #     self.direction_history.pop(0)
-
-
 
                 # Convert direction into an angle for the result
                 estimated_angle = self._calculate_estimated_angle(
@@ -272,17 +270,22 @@ class SoundLocalizer:
         #     self.total_results.pop(0)
 
         logger.debug(f"Localization results for current chunk: {results}")
-        yield results
+        return results
 
     def _compute_cross_spectrum(
         # self, mic_signals: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
-        self, mic_fft: np.ndarray[Int], fft_size: int = 1024, gamma: float = 0.1
+        self,
+        mic_fft: np.ndarray[Int],
+        fft_size: int = 1024,
+        gamma: float = 0.1,
     ) -> np.ndarray[Complex]:
         """Compute the cross-power spectrum between microphone pairs."""
         # Correct shape: (num_mics, num_mics, fft_size // 2 + 1) for the rfft result
-         # Ensure mic_fft has correct shape (num_mics, num_freqs)
+        # Ensure mic_fft has correct shape (num_mics, num_freqs)
         if mic_fft.shape[-1] != len(self.freqs):
-            raise ValueError(f"FFT shape mismatch. Expected {len(self.freqs)} frequency bins, got {mic_fft.shape[-1]}")
+            raise ValueError(
+                f"FFT shape mismatch. Expected {len(self.freqs)} frequency bins, got {mic_fft.shape[-1]}"
+            )
 
         # mic_signals = mic_signals.astype(np.int16)
 
@@ -290,12 +293,12 @@ class SoundLocalizer:
         # mic_fft = np.fft.rfft(mic_signals, fft_size)
 
         # Compute the power spectral density (PSD)
-        #mic_psd = np.abs(mic_fft) ** 2
+        # mic_psd = np.abs(mic_fft) ** 2
         current_psd = np.abs(mic_fft) ** 2
         # current_psd = np.mean(np.abs(mic_fft) ** 2, axis=1, keepdims=True)
 
         # Compute the noise estimate as the time average of the PSD
-        # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate 
+        # TODO: Not sure if we have to keep track of previous `mic_psd` to calculate noise estimate
         # noise_estimate = np.mean(mic_psd, axis=1, keepdims=True)
 
         # Update PSD history
@@ -315,9 +318,7 @@ class SoundLocalizer:
         # )
 
         weight = np.where(
-            current_psd <= mean_psd,
-            1,
-            (current_psd / (mean_psd + 1e-10)) ** gamma
+            current_psd <= mean_psd, 1, (current_psd / (mean_psd + 1e-10)) ** gamma
         )
 
         # Compute the cross-power spectrum for each microphone pair using broadcasting
@@ -335,7 +336,12 @@ class SoundLocalizer:
     ) -> np.ndarray[Float]:
         """Generate a grid of points on a circular plane, optimized for speed."""
         # Create radial distances from 0 to the specified radius
-        r = np.linspace(robot_radius_offset, max_grid_radius + robot_radius_offset, num_points_radial, dtype=Float)
+        r = np.linspace(
+            robot_radius_offset,
+            max_grid_radius + robot_radius_offset,
+            num_points_radial,
+            dtype=Float,
+        )
 
         # Create angular values from 0 to 2*pi
         theta = np.linspace(0, 2 * np.pi, num_points_angular, dtype=Float)
@@ -367,7 +373,7 @@ class SoundLocalizer:
         self,
         short_cross_spectrum: np.ndarray[Complex],
         long_cross_spectrum: np.ndarray[Complex],
-        probability_threshold: float = 0.3
+        probability_threshold: float = 0.3,
     ) -> Optional[Tuple[np.ndarray, Float, int]]:
         """Search the circular grid for the direction with maximum beamformer output."""
         short_term_energies = self._compute_beamformer_energies(short_cross_spectrum)
@@ -479,7 +485,7 @@ class SoundLocalizer:
         medium_term_energy: np.ndarray[Float],
         beta: float = 0.7,
         p1: float = 0.5,
-        energy_threshold: float = 0.5
+        energy_threshold: float = 0.5,
     ) -> np.ndarray[Float]:
         # Use reference energy
         # reference_energy = 1e6  # Choose based on your typical energy values
@@ -493,8 +499,12 @@ class SoundLocalizer:
         normalized_medium_term_energy = medium_term_energy / np.max(medium_term_energy)
 
         # Apply energy threshold to filter out very low energy sources
-        normalized_short_term_energy[normalized_short_term_energy < energy_threshold] = 0
-        normalized_medium_term_energy[normalized_medium_term_energy < energy_threshold] = 0
+        normalized_short_term_energy[
+            normalized_short_term_energy < energy_threshold
+        ] = 0
+        normalized_medium_term_energy[
+            normalized_medium_term_energy < energy_threshold
+        ] = 0
 
         logger.info(f"Max energy: {np.max(normalized_short_term_energy)}")
         logger.info(f"Mean energy: {np.mean(normalized_short_term_energy)}")
@@ -517,7 +527,9 @@ class SoundLocalizer:
             not_present_prob_short_term_energy * not_present_prob_medium_term_energy
         ) ** (1 - beta / 2) / (p1 ** (1 - beta))
 
-        logger.info(f"Max Prob source not present: {np.max(probability_source_not_present)}")
+        logger.info(
+            f"Max Prob source not present: {np.max(probability_source_not_present)}"
+        )
 
         # Calculate the posterior probabilities
         posterior_probabilities = 1 / (
