@@ -56,6 +56,7 @@ class OpenAITimeoutError(Exception):
 class OpenAIResponseType(Enum):
     TEXT = "TEXT"
     AUDIO = "AUDIO"
+    COMPLETED = "COMPLETED"
     NONE = "NONE"
 
 
@@ -87,6 +88,8 @@ class OpenAIWebsocketClient:
         self.audio_ring_buffer: AudioRingBuffer = AudioRingBuffer(max_chunks=10000)
         self.current_ms: int = 0
         self.started_ms: int = 0
+        self.stopped_ms: int = 0
+        self.speech_queue: List[tuple[int, int]] = []
 
     def __enter__(self):
         self._connect()
@@ -173,7 +176,17 @@ class OpenAIWebsocketClient:
 
         # Checks to see if an actual text response was sent, and returns the text
         if message["type"] == "response.text.done":
-            return OpenAIResponse(type=OpenAIResponseType.TEXT, text=message["text"])
+            # return OpenAIResponse(type=OpenAIResponseType.TEXT, text=message["text"])
+            speech_start_ms, speech_end_ms = self.speech_queue.pop(0)
+            audio_chunks = self.audio_ring_buffer.get_chunks(
+                start_ms=speech_start_ms, end_ms=speech_end_ms
+            )
+
+            return OpenAIResponse(
+                type=OpenAIResponseType.COMPLETED,
+                audio_chunks=audio_chunks,
+                text=message["text"],
+            )
 
         # Speech started, so we need to get the audio chunks
         if message["type"] == "input_audio_buffer.speech_started":
@@ -181,14 +194,11 @@ class OpenAIWebsocketClient:
 
         # Speech ended, so we need to reset the current time
         if message["type"] == "input_audio_buffer.speech_stopped":
-            audio_chunks = self.audio_ring_buffer.get_chunks(
-                start_ms=self.started_ms, end_ms=self.current_ms
-            )
-
             self.started_ms = 0
-            return OpenAIResponse(
-                type=OpenAIResponseType.AUDIO, audio_chunks=audio_chunks
-            )
+            self.speech_queue.append((self.started_ms, self.current_ms))
+            # return OpenAIResponse(
+            #     type=OpenAIResponseType.AUDIO, audio_chunks=audio_chunks
+            # )
 
         return OpenAIResponse(type=OpenAIResponseType.NONE)
 
