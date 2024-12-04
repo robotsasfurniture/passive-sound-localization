@@ -1,96 +1,105 @@
-import webrtcvad
-from localization import NewSoundLocalizer, SoundLocalizer
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
+from localization import LocalizationResult, SoundLocalizer
 from models.configs.realtime_streamer import (
     RealtimeAudioStreamerConfig,
 )
 from models.configs.logging import LoggingConfig
-from visualizer import Visualizer
+from models.configs.openai_websocket import (
+    OpenAIWebsocketConfig,
+)
 from models.configs.localization import LocalizationConfig
+from realtime_openai_websocket import OpenAIResponseType, OpenAIWebsocketClient
 from realtime_audio_streamer import RealtimeAudioStreamer
 import logging
 from logger import setup_logger
+import sys
+import os
 
 setup_logger(LoggingConfig(), enable_logging=True)
 logger = logging.getLogger(__name__)
 
-
-localization_config = LocalizationConfig()
-
-streamer_manager = RealtimeAudioStreamer(RealtimeAudioStreamerConfig())
-localizer = SoundLocalizer(
-    localization_config,
-    Visualizer(microphone_positions=localization_config.mic_positions),
+streamer_manager = RealtimeAudioStreamer(
+    RealtimeAudioStreamerConfig(
+        sample_rate=44100,
+        chunk=882,
+        # device_indices=[1],
+    )
 )
-# localizer = NewSoundLocalizer(
-#     localization_config,
-#     Visualizer(microphone_positions=localization_config.mic_positions),
-# )
+
+openai_ws_client = OpenAIWebsocketClient(
+    OpenAIWebsocketConfig(
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+)
+
+localizer = SoundLocalizer(LocalizationConfig())
 
 
-def voice_activity_detection(sound_data_chunk, frame_duration_ms=30, sample_rate=16000):
-    """
-    Detects voice activity in a given chunk of sound data using py-webrtcvad.
+def send_audio_continuously(
+    client: OpenAIWebsocketClient,
+    streamer: RealtimeAudioStreamer,
+    logger: logging.Logger,
+):
+    logger.info("Sending audio to OpenAI")
+    for audio_streams in streamer.audio_generator():
+        if audio_streams is None:
+            continue
 
-    Parameters:
-    - sound_data_chunk: A list of audio bytes representing a single chunk from multiple sources.
-    - frame_duration_ms: Duration of each frame in milliseconds (10, 20, or 30).
-    - sample_rate: Sample rate of the audio in Hz (must be 16,000 Hz for webrtcvad).
+        client.send_audio(streamer.resample_stream(audio_streams[0]))
+        client.store_audio(audio_streams)
 
-    Returns:
-    - bool: True if voice activity is detected in any of the sound sources; otherwise, False.
-    """
-    frame_length = int(
-        sample_rate * frame_duration_ms / 1000
-    )  # Calculate frame length in bytes
-    vad = webrtcvad.Vad(mode=3)  # Aggressiveness level for VAD (0-3)
-    frame_size = int(
-        sample_rate * frame_duration_ms / 1000 * 2
-    )  # Frame size in bytes (2 bytes per sample for 16-bit PCM)
 
-    for sound_bytes in sound_data_chunk:
-        # Ensure the sound data is a multiple of frame_size
-        if len(sound_bytes) < frame_size:
-            logger.warning("Frame size too small, skipping this chunk.")
-            continue  # Skip chunks that are too small
+def receive_text_messages(
+    client: OpenAIWebsocketClient,
+    localizer: SoundLocalizer,
+    publisher: Callable,
+    logger: logging.Logger,
+):
+    logger.info("OpanAI: Listening to audio stream")
+    locations = deque(maxlen=10)
+    while True:
+        try:
+            response = client.receive_response()
 
-        # Split sound_bytes into frames of frame_size
-        frames = [
-            sound_bytes[i : i + frame_size]
-            for i in range(0, len(sound_bytes), frame_size)
-            if len(sound_bytes[i : i + frame_size]) == frame_size
-        ]
+            if response["type"] == OpenAIResponseType.NONE:
+                continue
 
-        # Check each frame for speech
-        for frame in frames:
-            if vad.is_speech(frame, sample_rate):
-                logger.info("Voice activity detected.")
-                return True
+            if response["type"] == OpenAIResponseType.TEXT:
+                logger.info(f"Received text response: {response['text']}")
+                if response["text"].strip() == "MOVE_TO":
+                    logger.info("Received command: MOVE_TO")
 
-    logger.info("No voice activity detected.")
-    return False
+                    if len(locations) > 0:
+                        location = locations.pop()
+                        logger.info(f"Publishing location: {location}")
+                        publisher(location)
+                    else:
+                        logger.error("No locations to publish")
 
-while True:
-    did_get = False
-    with streamer_manager as streamer:
-        total_results = []
-        for audio_streams in streamer.audio_generator():
-            try:
-                if audio_streams is None:
-                    logger.error("Audio streams are None")
-                    continue
+            elif response["type"] == OpenAIResponseType.AUDIO:
+                logger.info(f"Received audio chunks: {len(response['audio_chunks'])}")
 
-                if not voice_activity_detection(audio_streams, sample_rate=16000):
-                    continue
+                for audio_chunks in response["audio_chunks"]:
+                    localization_results = localizer.localize(audio_chunks)
+                    locations.extend(localization_results)
 
-                #  Stream audio data and pass it to the localizer
-                localization_stream = localizer.localize_stream(
-                    audio_streams,
-                )
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logger.error(f"Error receiving response: {str(e)}")
+            logger.error(f"{exc_type}, {fname}, {exc_tb.tb_lineno}")
 
-                for localization_results in localization_stream:
-                    if len(localization_results) > 0:
-                        logger.info(f"Localization results: {localization_results[0]}")
-                    
 
-            except Exception as e:
-                print(f"Realtime Localization error: {e}")
+with streamer_manager as streamer, openai_ws_client as client:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        logger.info("Threading log")
+        executor.submit(send_audio_continuously, client, streamer, logger)
+        executor.submit(
+            receive_text_messages,
+            client,
+            None,
+            lambda x: print(x),
+            logger,
+        )
