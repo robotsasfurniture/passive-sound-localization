@@ -39,7 +39,6 @@ def receive_text_messages(
     logger: logging.Logger,
 ):
     logger.info("OpanAI: Listening to audio stream")
-    locations = deque(maxlen=10)
     while True:
         try:
             response = client.receive_response()
@@ -48,26 +47,46 @@ def receive_text_messages(
                 case OpenAIResponseType.NONE:
                     continue
 
-                case OpenAIResponseType.TEXT:
+                case OpenAIResponseType.COMPLETED:
                     logger.info(f"Received text response: {response['text']}")
                     if response["text"].strip() == "MOVE_TO":
                         logger.info("Received command: MOVE_TO")
 
-                        if len(locations) > 0:
-                            location = locations.pop()
-                            logger.info(f"Publishing location: {location}")
-                            publisher(location)
-                        else:
+                        locations = []
+                        for audio_chunk in response["audio_chunks"]:
+                            localization_results = localizer.localize(audio_chunk)
+                            locations.extend(localization_results)
+
+                        if len(locations) == 0:
                             logger.error("No locations to publish")
+                            continue
 
-                case OpenAIResponseType.AUDIO:
-                    logger.info(
-                        f"Received audio chunks: {len(response['audio_chunks'])}"
-                    )
+                        # Take the mean of all locations
+                        best_location = LocalizationResult(
+                            angle=sum(location.angle for location in locations)
+                            / len(locations),
+                            distance=sum(location.distance for location in locations)
+                            / len(locations),
+                        )
 
-                    for audio_chunks in response["audio_chunks"]:
-                        localization_results = localizer.localize(audio_chunks)
-                        locations.extend(localization_results)
+                        logger.info(f"Publishing location: {best_location}")
+                        publisher(best_location)
+
+                        # if len(locations) > 0:
+                        #     location = locations.pop()
+                        #     logger.info(f"Publishing location: {location}")
+                        #     publisher(location)
+                        # else:
+                        #     logger.error("No locations to publish")
+
+                # case OpenAIResponseType.AUDIO:
+                #     logger.info(
+                #         f"Received audio chunks: {len(response['audio_chunks'])}"
+                #     )
+
+                #     for audio_chunks in response["audio_chunks"]:
+                #         localization_results = localizer.localize(audio_chunks)
+                #         locations.extend(localization_results)
 
                 case _:
                     logger.error(f"Received unknown response type: {response['type']}")

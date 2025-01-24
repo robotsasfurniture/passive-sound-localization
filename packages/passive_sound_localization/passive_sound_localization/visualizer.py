@@ -17,6 +17,7 @@ class Visualizer:
         """
         # Convert from 3D to 2D by dropping the z-coordinate
         self.microphone_positions = np.array(microphone_positions)
+        # self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1)
         self.fig, self.ax = plt.subplots()
         plt.ion()
 
@@ -28,13 +29,17 @@ class Visualizer:
         angle: float,
         distance: float,
         selected_grid_point: Tuple[float, float],
-        average_point: Tuple[float, float],
+        energies: np.ndarray
+        # average_point: Tuple[float, float],
     ):
         """
         Plot the positions of the microphones and the target in real-time.
         """
 
         self.ax.clear()  # Clear previous plots
+        # if self.colorbar is not None:
+        #     self.colorbar.remove()
+        #     self.colorbar = None
 
         # Plot grid points if available
         if len(self.grid_points) > 0:
@@ -42,10 +47,14 @@ class Visualizer:
             self.ax.scatter(
                 grid_points[:, 0],
                 grid_points[:, 1],
-                c="blue",
+                # c="blue",
+                c=energies,
+                cmap="viridis",
                 label="Grid Points",
                 s=1,
             )
+
+            # self.colorbar = self.fig.colorbar(scatter, ax=self.ax, label="Beamformer Energy")
 
         # Plot microphone positions
         self.ax.scatter(
@@ -64,12 +73,12 @@ class Visualizer:
         )
 
         # Plot the average point
-        self.ax.scatter(
-            average_point[0],
-            average_point[1],
-            c="purple",
-            label="Average Point",
-        )
+        # self.ax.scatter(
+        #     average_point[0],
+        #     average_point[1],
+        #     c="purple",
+        #     label="Average Point",
+        # )
 
         # Draw a line to represent the angle and distance
         # x_line = self.microphone_positions[0, 0] + distance * np.cos(angle)

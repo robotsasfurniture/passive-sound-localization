@@ -17,7 +17,7 @@ class SoundLocalizer:
         """
         self.model = torch.load(model_path)
         self.sampling_rate = sampling_rate
-
+        
     def _generate_spectrogram(self, stream: np.ndarray) -> torch.Tensor:
         """
         Generates a spectrogram from an audio stream.
@@ -34,7 +34,6 @@ class SoundLocalizer:
     def calculate_distance(x: float, y: float) -> float:
         """
         Calculates the distance to the target given x and y coordinates.
-
         :param x: X coordinate of the target.
         :param y: Y coordinate of the target.
         :return: Distance to the target.
@@ -45,7 +44,6 @@ class SoundLocalizer:
     def calculate_angle(x: float, y: float) -> float:
         """
         Calculates the angle to the target given x and y coordinates.
-
         :param x: X coordinate of the target.
         :param y: Y coordinate of the target.
         :return: Angle to the target in degrees.
