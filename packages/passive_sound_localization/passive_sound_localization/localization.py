@@ -1,4 +1,6 @@
+from typing import List
 import numpy as np
+from passive_sound_localization.visualizer import Visualizer
 import torch
 from scipy.signal import spectrogram
 
@@ -8,7 +10,7 @@ class LocalizationResult:
         self.distance = distance
 
 class SoundLocalizer:
-    def __init__(self, model_path: str, sampling_rate: int = 16000):
+    def __init__(self, model_path: str, sampling_rate: int = 16000, visualizer: Visualizer = None):
         """
         Initializes the sound localizer.
 
@@ -17,6 +19,8 @@ class SoundLocalizer:
         """
         self.model = torch.load(model_path)
         self.sampling_rate = sampling_rate
+        self.visualizer = visualizer
+        self.visualizer.open_loading_screen()
         
     def _generate_spectrogram(self, stream: np.ndarray) -> torch.Tensor:
         """
@@ -50,7 +54,7 @@ class SoundLocalizer:
         """
         return np.arctan2(y, x) * (180 / np.pi)
 
-    def localize(self, streams: np.ndarray) -> LocalizationResult:
+    def localize(self, streams: np.ndarray) -> List[LocalizationResult]:
         """
         Localizes the sound source given audio streams.
 
@@ -79,4 +83,6 @@ class SoundLocalizer:
         distance = self.calculate_distance(x, y)
         angle = self.calculate_angle(x, y)
 
-        return LocalizationResult(angle=angle, distance=distance)
+        self.visualizer.plot(angle=angle, distance=distance, selected_grid_point=predicted_coordinates)
+
+        return [LocalizationResult(angle=angle, distance=distance)]
