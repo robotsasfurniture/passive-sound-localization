@@ -134,7 +134,9 @@ class LocalizationNode(Node):
 
         # Initialize components with configurations
         self.localizer = SoundLocalizer(
-            self.config.localization, Visualizer(self.config.localization.mic_positions)
+            model_path="<insert model path>",
+            sampling_rate=16000, 
+            visualizer=Visualizer(self.config.localization.mic_positions)
         )
         self.streamer = RealtimeAudioStreamer(self.config.realtime_streamer)
         self.openai_ws_client = OpenAIWebsocketClient(self.config.openai_websocket)
