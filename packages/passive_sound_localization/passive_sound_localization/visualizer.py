@@ -29,7 +29,7 @@ class Visualizer:
         angle: float,
         distance: float,
         selected_grid_point: Tuple[float, float],
-        energies: np.ndarray
+        # energies: np.ndarray
         # average_point: Tuple[float, float],
     ):
         """
@@ -42,17 +42,17 @@ class Visualizer:
         #     self.colorbar = None
 
         # Plot grid points if available
-        if len(self.grid_points) > 0:
-            grid_points = np.array(self.grid_points)
-            self.ax.scatter(
-                grid_points[:, 0],
-                grid_points[:, 1],
-                # c="blue",
-                c=energies,
-                cmap="viridis",
-                label="Grid Points",
-                s=1,
-            )
+        # if len(self.grid_points) > 0:
+        #     grid_points = np.array(self.grid_points)
+        #     self.ax.scatter(
+        #         grid_points[:, 0],
+        #         grid_points[:, 1],
+        #         # c="blue",
+        #         c=energies,
+        #         cmap="viridis",
+        #         label="Grid Points",
+        #         s=1,
+        #     )
 
             # self.colorbar = self.fig.colorbar(scatter, ax=self.ax, label="Beamformer Energy")
 
@@ -103,11 +103,11 @@ class Visualizer:
         plt.draw()
         plt.pause(0.1)  # Pause briefly to refresh the plot
 
-    def set_grid_points(self, grid_points: List[Tuple[float, float]]):
-        """
-        Plot a grid of points.
-        """
-        self.grid_points = grid_points
+    # def set_grid_points(self, grid_points: List[Tuple[float, float]]):
+    #     """
+    #     Plot a grid of points.
+    #     """
+    #     self.grid_points = grid_points
 
     def open_loading_screen(self):
         """
