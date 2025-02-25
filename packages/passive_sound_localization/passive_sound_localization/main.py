@@ -12,7 +12,6 @@ from passive_sound_localization.visualizer import Visualizer
 from passive_sound_localization_msgs.msg import LocalizationResult
 
 from concurrent.futures import ThreadPoolExecutor
-from collections import deque
 from rclpy.node import Node
 import logging
 import rclpy
@@ -134,7 +133,7 @@ class LocalizationNode(Node):
 
         # Initialize components with configurations
         self.localizer = SoundLocalizer(
-            self.config.localization, Visualizer(self.config.localization.mic_positions)
+            "models/latest.pth", self.config.localization.sample_rate
         )
         self.streamer = RealtimeAudioStreamer(self.config.realtime_streamer)
         self.openai_ws_client = OpenAIWebsocketClient(self.config.openai_websocket)
